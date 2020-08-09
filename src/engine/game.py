@@ -63,34 +63,32 @@ class SingleHand():
 
 class SingleHandStrength():
     def __init__(self, hand: SingleHand):
-        self.hand = hand
+        # self.hand = hand
+        self.cards = sorted(hand.cards)
+        self.suit_counter = Counter(card.suit for card in self.cards)
+        self.height_counter = Counter(card.int_height for card in self.cards)
         self.strength = self._compute_strength()
+        print(*self.cards, '-->', self.strength)
 
     def _compute_strength(self):
-        def is_flush(
-                cards: List[Card],
-                suit_counter: typing.Counter[Suit],
-        ) -> Tuple[bool, List[int]]:
+        def is_flush() -> Tuple[bool, List[int]]:
             # check = len(cards) == 5 and len(set(card.suit for card in cards)) == 1
-            check = len(cards) == 5 and len(suit_counter) == 1
+            check = len(self.cards) == 5 and len(self.suit_counter) == 1
 
             if check:
-                height = [card.int_height for card in cards[::-1]]
+                height = [card.int_height for card in self.cards[::-1]]
             else:
                 height = []
 
             return check, height
 
-        def is_straight(
-                cards: List[Card],
-                height_counter: typing.Counter[int]
-        ) -> Tuple[bool, int]:
+        def is_straight() -> Tuple[bool, int]:
             # If there is less than 5 cards or any pair, three of kind
             # or four of a kind, there cannot be a straight
-            if len(cards) != 5 or len(height_counter) != 5:
+            if len(self.cards) != 5 or len(self.height_counter) != 5:
                 return False, -1
 
-            heights = [card.int_height for card in cards]
+            heights = [card.int_height for card in self.cards]
             # # If there is any pair, there cannot be a straight
             # if len(set(heights)) != 5:
             #     return False, -1
@@ -106,14 +104,11 @@ class SingleHandStrength():
 
             return False, -1
 
-        def is_full_house(
-                cards: List[Card],
-                height_counter: typing.Counter[int]
-        ) -> Tuple[bool, Tuple[int, int]]:
-            if len(height_counter) != 2:
+        def is_full_house() -> Tuple[bool, Tuple[int, int]]:
+            if len(self.height_counter) != 2:
                 return False, (-1, -1)
 
-            most_common = height_counter.most_common()
+            most_common = self.height_counter.most_common()
             (
                 (first_mc_height, first_mc_count),
                 (second_mc_height, second_mc_count),
@@ -124,62 +119,76 @@ class SingleHandStrength():
 
             return False, (-1, -1)
 
-        def is_n_of_a_kind(
-                cards: List[Card],
-                n: int,
-                height_counter: typing.Counter[int]
-        ) -> Tuple[bool, int]:
-            (mc_height, mc_count), *_ = height_counter.most_common()
+        def is_n_of_a_kind(n: int) -> Tuple[bool, int]:
+            (mc_height, mc_count), *_ = self.height_counter.most_common()
             if mc_count == n:
                 return True, mc_height
 
             return False, -1
 
-        def is_four_of_a_kind(
-                cards: List[Card],
-                height_counter: typing.Counter[int]
-        ) -> Tuple[bool, int]:
-            return is_n_of_a_kind(cards, 4, height_counter)
+        def is_four_of_a_kind() -> Tuple[bool, int]:
+            return is_n_of_a_kind(4)
 
-        def is_three_of_a_kind(
-                cards: List[Card],
-                height_counter: typing.Counter[int]
-        ) -> Tuple[bool, int]:
-            return is_n_of_a_kind(cards, 3, height_counter)
+        def is_three_of_a_kind() -> Tuple[bool, int]:
+            return is_n_of_a_kind(3)
 
         def is_two_pairs(
-                cards: List[Card],
-                height_counter: typing.Counter[int]
-        ) -> Tuple[bool, int, int, int]:
-            if len(height_counter) < 3:
-                return False, -1, -1, -1
+        ) -> Tuple[bool, Tuple[int, int, int]]:
+            if len(self.height_counter) != 3:
+                return False, (-1, -1, -1)
 
-            most_common = height_counter.most_common()
             (
                 (first_mc_height, first_mc_count),
                 (second_mc_height, second_mc_count),
                 (third_mc_height, third_mc_count)
-            ) = most_common
+            ) = self.height_counter.most_common()
 
-            if first_mc_count == 2 and second_mc_count == 2 and third_mc_count == 1:
+            if first_mc_count == 2 and \
+               second_mc_count == 2 and \
+               third_mc_count == 1:
                 if second_mc_height > first_mc_height:
-                    first_mc_height, second_mc_height = second_mc_height, first_mc_height
-                return True, first_mc_height, second_mc_height, third_mc_count
+                    (
+                        first_mc_height,
+                        second_mc_height
+                    ) = second_mc_height, first_mc_height
+                return True, (
+                    first_mc_height,
+                    second_mc_height,
+                    third_mc_count
+                )
 
-            return False, -1, -1, -1
+            return False, (-1, -1, -1)
 
-        def is_one_pair(
-                cards: List[Card],
-                height_counter: typing.Counter[int]
-        ) -> Tuple[bool, int]:
-            return is_n_of_a_kind(cards, 2, height_counter)
+        def is_one_pair() -> Tuple[bool, Tuple[int, int, int, int]]:
+            if len(self.height_counter) != 4:
+                return False, (-1, -1, -1, -1)
 
-        cards = sorted(self.hand.cards)
-        suit_counter = Counter(card.suit for card in cards)
-        height_counter = Counter(card.int_height for card in cards)
+            (mc_height, mc_count), *_ = self.height_counter.most_common()
 
-        flush_check, flush_val = is_flush(cards, suit_counter)
-        straight_check, straight_val = is_straight(cards, height_counter)
+            if mc_count == 2:
+                non_paired_cards_heights = [
+                    card.int_height
+                    for card in self.cards[::-1]
+                    if card.int_height != mc_height
+                ]
+                return True, (
+                    mc_height,
+                    non_paired_cards_heights[0],
+                    non_paired_cards_heights[1],
+                    non_paired_cards_heights[2],
+                )
+
+
+            return False, (-1, -1, -1, -1)
+
+        def is_high_card() -> Tuple[bool, Tuple[int, ...]]:
+            if len(self.height_counter) != 5:
+                return False, (-1, -1, -1, -1, -1)
+
+            return True, tuple([card.int_height for card in self.cards[::-1]])
+
+        flush_check, flush_val = is_flush()
+        straight_check, straight_val = is_straight()
 
         if flush_check:
             if straight_check:
@@ -190,42 +199,31 @@ class SingleHandStrength():
         if straight_check:
             return HandRank.STRAIGHT, straight_val
 
-        four_of_a_kind_check, four_of_kind_val = is_four_of_a_kind(
-            cards,
-            height_counter
-        )
+        four_of_a_kind_check, four_of_kind_val = is_four_of_a_kind()
         if four_of_a_kind_check:
             return HandRank.FOUR_OF_A_KIND, four_of_kind_val
 
-        full_house_check, full_house_val = is_full_house(cards, height_counter)
+        full_house_check, full_house_val = is_full_house()
         if full_house_check:
             return HandRank.FULL_HOUSE, *full_house_val
 
-        three_of_a_kind_check, three_of_kind_val = is_three_of_a_kind(
-            cards,
-            height_counter
-        )
+        three_of_a_kind_check, three_of_kind_val = is_three_of_a_kind()
         if three_of_a_kind_check:
             return HandRank.THREE_OF_A_KIND, three_of_kind_val
 
-        two_pairs_check, two_pairs_val = is_two_pairs(cards, height_counter)
+        two_pairs_check, two_pairs_val = is_two_pairs()
         if two_pairs_check:
             return HandRank.TWO_PAIRS, *two_pairs_val
 
-# class HandRank(IntEnum):
-#     HIGH_CARD = 0
-#     ONE_PAIR = 1
-#     TWO_PAIRS = 2
+        one_pair_check, one_pair_val = is_one_pair()
+        if one_pair_check:
+            return HandRank.ONE_PAIR, *one_pair_val
 
-        four_of_a_kind = is_four_of_a_kind(cards, height_counter)
-        full_house = is_full_house(cards, height_counter)
-        print(
-            cards,
-            '--> fl', flush_check,
-            'st', straight_check,
-            'foak', four_of_a_kind,
-            'fh', full_house
-        )
+        high_card_check, high_card_value = is_high_card()
+        if high_card_check:
+            return HandRank.HIGH_CARD, *high_card_value
+
+        pdb.set_trace()
 
 class Hand():
     def __init__(self):
@@ -258,8 +256,8 @@ hands = [
         Card(Suit.c, '3'),
         Card(Suit.h, '3'),
         Card(Suit.s, '3'),
-        Card(Suit.d, '3'),
-        Card(Suit.s, '7')
+        Card(Suit.s, '7'),
+        Card(Suit.d, '3')
     ]),
     SingleHand([
         Card(Suit.c, 'K'),
@@ -269,6 +267,20 @@ hands = [
         Card(Suit.s, '5')
     ]),
     SingleHand([
+        Card(Suit.d, 'A'),
+        Card(Suit.d, 'T'),
+        Card(Suit.d, '7'),
+        Card(Suit.d, '8'),
+        Card(Suit.d, '4')
+    ]),
+    SingleHand([
+        Card(Suit.s, 'J'),
+        Card(Suit.c, '7'),
+        Card(Suit.c, 'T'),
+        Card(Suit.h, '8'),
+        Card(Suit.h, '9'),
+    ]),
+    SingleHand([
         Card(Suit.c, 'A'),
         Card(Suit.h, 'T'),
         Card(Suit.h, '8'),
@@ -276,17 +288,10 @@ hands = [
         Card(Suit.s, '8')
     ]),
     SingleHand([
-        Card(Suit.c, '7'),
-        Card(Suit.h, '8'),
-        Card(Suit.h, '9'),
+        Card(Suit.d, '2'),
         Card(Suit.c, 'T'),
-        Card(Suit.s, 'J'),
-    ]),
-    SingleHand([
-        Card(Suit.c, '2'),
-        Card(Suit.c, '3'),
-        Card(Suit.c, '5'),
-        Card(Suit.c, '4'),
+        Card(Suit.c, 'T'),
+        Card(Suit.s, '2'),
         Card(Suit.c, '6')
     ]),
     SingleHand([
@@ -296,8 +301,21 @@ hands = [
         Card(Suit.c, '4'),
         Card(Suit.c, '5')
     ]),
+    SingleHand([
+        Card(Suit.c, '2'),
+        Card(Suit.c, '3'),
+        Card(Suit.d, 'A'),
+        Card(Suit.c, '4'),
+        Card(Suit.s, '3')
+    ]),
+    SingleHand([
+        Card(Suit.c, '2'),
+        Card(Suit.c, '3'),
+        Card(Suit.d, '4'),
+        Card(Suit.c, '5'),
+        Card(Suit.s, '7')
+    ]),
 ]
 
 for hand in hands:
-    print('##########')
     SingleHandStrength(hand)
