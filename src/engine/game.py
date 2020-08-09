@@ -1,14 +1,27 @@
 import typing
 from typing import List, Tuple
-from enum import Enum, auto
+from enum import Enum, IntEnum, auto
 from functools import total_ordering
 from collections import Counter
+
 
 class Suit(Enum):
     d = auto()
     c = auto()
     s = auto()
     h = auto()
+
+
+class HandRank(IntEnum):
+    HIGH_CARD = 0
+    ONE_PAIR = 1
+    TWO_PAIRS = 2
+    THREE_OF_A_KIND = 3
+    STRAIGHT = 4
+    FLUSH = 5
+    FULL_HOUSE = 6
+    FOUR_OF_A_KIND = 7
+    STRAIGHT_FLUSH = 8
 
 @total_ordering
 class Card:
@@ -96,18 +109,20 @@ class SingleHandStrength():
         def is_full_house(
                 cards: List[Card],
                 height_counter: typing.Counter[int]
-        ) -> Tuple[bool, int, int]:
+        ) -> Tuple[bool, Tuple[int, int]]:
+            if len(height_counter) != 2:
+                return False, (-1, -1)
+
             most_common = height_counter.most_common()
             (
                 (first_mc_height, first_mc_count),
                 (second_mc_height, second_mc_count),
-                *_
             ) = most_common
 
             if first_mc_count == 3 and second_mc_count == 2:
-                return True, first_mc_height, second_mc_height
+                return True, (first_mc_height, second_mc_height)
 
-            return False, -1, -1
+            return False, (-1, -1)
 
         def is_n_of_a_kind(
                 cards: List[Card],
@@ -135,21 +150,23 @@ class SingleHandStrength():
         def is_two_pairs(
                 cards: List[Card],
                 height_counter: typing.Counter[int]
-        ) -> Tuple[bool, int, int]:
+        ) -> Tuple[bool, int, int, int]:
+            if len(height_counter) < 3:
+                return False, -1, -1, -1
+
             most_common = height_counter.most_common()
             (
                 (first_mc_height, first_mc_count),
                 (second_mc_height, second_mc_count),
-                *_
+                (third_mc_height, third_mc_count)
             ) = most_common
 
-            if first_mc_count == 2 and second_mc_count == 2:
+            if first_mc_count == 2 and second_mc_count == 2 and third_mc_count == 1:
                 if second_mc_height > first_mc_height:
                     first_mc_height, second_mc_height = second_mc_height, first_mc_height
-                return True, first_mc_height, second_mc_height
+                return True, first_mc_height, second_mc_height, third_mc_count
 
-            return False, -1, -1
-
+            return False, -1, -1, -1
 
         def is_one_pair(
                 cards: List[Card],
@@ -161,14 +178,51 @@ class SingleHandStrength():
         suit_counter = Counter(card.suit for card in cards)
         height_counter = Counter(card.int_height for card in cards)
 
-        flush = is_flush(cards, suit_counter)
-        straight = is_straight(cards, height_counter)
+        flush_check, flush_val = is_flush(cards, suit_counter)
+        straight_check, straight_val = is_straight(cards, height_counter)
+
+        if flush_check:
+            if straight_check:
+                return HandRank.STRAIGHT_FLUSH, straight_val
+
+            return HandRank.FLUSH, *flush_val
+
+        if straight_check:
+            return HandRank.STRAIGHT, straight_val
+
+        four_of_a_kind_check, four_of_kind_val = is_four_of_a_kind(
+            cards,
+            height_counter
+        )
+        if four_of_a_kind_check:
+            return HandRank.FOUR_OF_A_KIND, four_of_kind_val
+
+        full_house_check, full_house_val = is_full_house(cards, height_counter)
+        if full_house_check:
+            return HandRank.FULL_HOUSE, *full_house_val
+
+        three_of_a_kind_check, three_of_kind_val = is_three_of_a_kind(
+            cards,
+            height_counter
+        )
+        if three_of_a_kind_check:
+            return HandRank.THREE_OF_A_KIND, three_of_kind_val
+
+        two_pairs_check, two_pairs_val = is_two_pairs(cards, height_counter)
+        if two_pairs_check:
+            return HandRank.TWO_PAIRS, *two_pairs_val
+
+# class HandRank(IntEnum):
+#     HIGH_CARD = 0
+#     ONE_PAIR = 1
+#     TWO_PAIRS = 2
+
         four_of_a_kind = is_four_of_a_kind(cards, height_counter)
         full_house = is_full_house(cards, height_counter)
         print(
             cards,
-            '--> fl', flush,
-            'st', straight,
+            '--> fl', flush_check,
+            'st', straight_check,
             'foak', four_of_a_kind,
             'fh', full_house
         )
