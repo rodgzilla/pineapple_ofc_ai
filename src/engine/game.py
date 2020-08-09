@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, cast
 from enum import Enum, IntEnum, auto
 from functools import total_ordering
 from collections import Counter, defaultdict
@@ -125,8 +125,7 @@ class SingleHandStrength():
         def is_three_of_a_kind() -> Tuple[bool, int]:
             return is_n_of_a_kind(3)
 
-        def is_two_pairs(
-        ) -> Tuple[bool, Tuple[int, int, int]]:
+        def is_two_pairs() -> Tuple[bool, Tuple[int, ...]]:
             if len(self.height_counter) != 3:
                 return False, (-1, -1, -1)
 
@@ -147,7 +146,7 @@ class SingleHandStrength():
                 return True, (
                     first_mc_height,
                     second_mc_height,
-                    third_mc_count
+                    third_mc_height
                 )
 
             return False, (-1, -1, -1)
@@ -188,25 +187,25 @@ class SingleHandStrength():
         if straight_check:
             return HandRank.STRAIGHT, straight_val
 
-        four_of_a_kind_check, four_of_kind_val = is_four_of_a_kind()
-        if four_of_a_kind_check:
-            return HandRank.FOUR_OF_A_KIND, four_of_kind_val
-
-        full_house_check, full_house_val = is_full_house()
-        if full_house_check:
-            return HandRank.FULL_HOUSE, full_house_val
-
-        three_of_a_kind_check, three_of_kind_val = is_three_of_a_kind()
-        if three_of_a_kind_check:
-            return HandRank.THREE_OF_A_KIND, three_of_kind_val
-
-        two_pairs_check, two_pairs_val = is_two_pairs()
-        if two_pairs_check:
-            return HandRank.TWO_PAIRS, two_pairs_val
-
-        one_pair_check, one_pair_val = is_one_pair()
-        if one_pair_check:
-            return HandRank.ONE_PAIR, one_pair_val
+        for rank, check_fun in zip(
+                [
+                    HandRank.FOUR_OF_A_KIND,
+                    HandRank.FULL_HOUSE,
+                    HandRank.THREE_OF_A_KIND,
+                    HandRank.TWO_PAIRS,
+                    HandRank.ONE_PAIR
+                ],
+                [
+                    is_four_of_a_kind,
+                    is_full_house,
+                    is_three_of_a_kind,
+                    is_two_pairs,
+                    is_one_pair
+                ]
+        ):
+            check, value = check_fun()
+            if check:
+                return rank, cast(Union[int, Tuple[int, ...]], value)
 
         high_card_check, high_card_value = is_high_card()
 
@@ -323,6 +322,10 @@ hands = [
     ]),
 ]
 
+for hand in hands:
+    strength = SingleHandStrength(hand)
+    print(hand, strength.rank, strength.val)
+
 def generate_random_hand(n_cards):
     cards = []
 
@@ -340,7 +343,7 @@ for _ in range(10):
     strength = SingleHandStrength(hand)
     print(sorted(hand.cards), strength.rank, strength.val)
 
-n = 10000
+n = 50000
 hand_by_rank = defaultdict(list)
 for _ in range(n):
     hand = generate_random_hand(5)
