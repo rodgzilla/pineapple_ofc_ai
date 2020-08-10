@@ -1,7 +1,8 @@
+import pdb
 from typing import List, Tuple, Union, Optional, cast
 from enum import Enum, IntEnum, auto
 from functools import total_ordering
-from collections import Counter
+from collections import Counter, defaultdict
 import random
 
 
@@ -16,6 +17,25 @@ class HandId(Enum):
     front = auto()
     middle = auto()
     back = auto()
+
+
+class PlayerId(Enum):
+    player_1 = auto()
+    player_2 = auto()
+
+
+class PlayId(Enum):
+    front = auto()
+    middle = auto()
+    back = auto()
+    discard = auto()
+
+
+play_id_to_hand_id = {
+    PlayId.front: HandId.front,
+    PlayId.middle: HandId.middle,
+    PlayId.back: HandId.back
+}
 
 
 class HandRank(IntEnum):
@@ -345,7 +365,7 @@ class Hand():
         self.strength = {}
         self.bonus = {}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '\n'.join(
             repr(self.hands[hand_id])
             for hand_id in [
@@ -355,6 +375,9 @@ class Hand():
             ]
         )
 
+    def __len__(self) -> int:
+        return sum(len(hand) for hand in self.hands.values())
+
     def add_card(self, hand_id: HandId, card: Card):
         if (hand_id == HandId.front and len(self.hands[hand_id]) == 3) or \
            (hand_id in (HandId.middle, HandId.back) and
@@ -363,8 +386,7 @@ class Hand():
 
         self.hands[hand_id].add_card(card)
 
-    # def _check_hand_complete(self):
-    def is_hand_complete(self):
+    def is_hand_complete(self) -> bool:
         for hand_id, hand in self.hands.items():
             if (hand_id == HandId.front and len(hand) != 3) or \
                (hand_id in (HandId.middle, HandId.back) and len(hand) != 5):
@@ -456,11 +478,193 @@ class Hand():
 
         return total_self_score, total_other_score
 
-# class Game():
-#     def __init__(self):
-#         print('salut')
-#         p1_hand = Hand()
-#         p2_hand = Hand()
+class Game():
+    def __init__(self):
+        self.deck = CardDeck()
+        self.p1_hand = Hand()
+        self.p2_hand = Hand()
+        self.hands = {
+            player_id: Hand()
+            for player_id in PlayerId
+        }
+        self.discarded_cards = defaultdict(list)
+
+    def __repr__(self) -> str:
+        return (
+            '#######\n'
+            'Deck\n'
+            f'{self.deck}\n'
+            '#######\n'
+            'Player 1 hand\n'
+            f'{self.hands[PlayerId.player_1]}\n'
+            '#######\n'
+            'Player 2 hand\n'
+            f'{self.hands[PlayerId.player_2]}\n'
+            '#######\n'
+            'Discarded cards\n'
+            f'Player 1: {self.discarded_cards[PlayerId.player_1]}\n'
+            f'Player 2: {self.discarded_cards[PlayerId.player_2]}'
+        )
+
+    def _draw_n_cards(self, n: int) -> Tuple[Card, ...]:
+        return tuple([
+            self.deck.draw_card()
+            for _ in range(n)
+        ])
+
+    def draw_five_cards(self) -> Tuple[Card, ...]:
+        return self._draw_n_cards(5)
+
+    def draw_three_cards(self) -> Tuple[Card, ...]:
+        return self._draw_n_cards(3)
+
+    def is_valid_play(
+            self,
+            player_id: PlayerId,
+            cards: List[Card],
+            play_ids: List[PlayId]
+    ) -> bool:
+        if len(cards) != len(play_ids):
+            return False
+
+        hand = self.hands[player_id]
+        if hand.is_hand_complete():
+            return False
+
+        play_counter = Counter(play_ids)
+
+        if len(cards) == 5:
+            # Discarding in the initial 5 cards is not allowed
+            if play_counter[PlayId.discard] != 0:
+                return False
+
+            # The front hand is limited to 3 cards
+            if play_counter[PlayId.front] > 3:
+                return False
+        elif len(cards) == 3:
+            # pdb.set_trace()
+            # For each 3 cards draws, we have a discard exactly one
+            if play_counter[PlayId.discard] != 1:
+                return False
+
+            front_hand_size = len(hand.hands[HandId.front])
+            if front_hand_size + play_counter[PlayId.front] > 3:
+                return False
+
+            middle_hand_size = len(hand.hands[HandId.middle])
+            if middle_hand_size + play_counter[PlayId.middle] > 5:
+                return False
+
+            back_hand_size = len(hand.hands[HandId.back])
+            if back_hand_size + play_counter[PlayId.back] > 5:
+                return False
+        else:
+            return False
+
+        return True
+
+    def play(
+            self,
+            player_id: PlayerId,
+            cards: List[Card],
+            play_ids: List[PlayId]
+    ):
+        if not self.is_valid_play(player_id, cards, play_ids):
+            raise ValueError('Invalid move')
+
+        hand = self.hands[player_id]
+        for card, position in zip(cards, play_ids):
+            if position == PlayId.discard:
+                self.discarded_cards[player_id].append(card)
+            else:
+                hand.hands[play_id_to_hand_id[position]].add_card(card)
+
+class GameLoop():
+    def __init__(self):
+        self.game = Game()
+        self.char_to_play_id = {
+            'B': PlayId.back,
+            'M': PlayId.middle,
+            'F': PlayId.front,
+            'D': PlayId.discard,
+        }
+        self.current_player = PlayerId.player_1
+
+    def _get_move(self, player_id: PlayerId, cards: List[Card], initial: bool) -> List[PlayId]:
+        def convert_str_to_play_ids(s: str) -> List[PlayId]:
+            return [
+                self.char_to_play_id[c]
+                for c in s
+            ]
+
+        hand = self.game.hands[player_id]
+        play_str = 'DDDDD'
+        play_ids = convert_str_to_play_ids(play_str)
+
+        while not self.game.is_valid_play(player_id, cards, play_ids):
+            if len(hand) != 0:
+                print(hand)
+            print('Your cards:', cards)
+            play_str = input('Your play (BMF):' if initial else 'Your play (BMFD):').upper()
+            if any(play_char not in 'BMFD' for play_char in play_str):
+                print('All moves must be in BMFD')
+                continue
+            play_ids = convert_str_to_play_ids(play_str)
+
+        return play_ids
+
+    def _print_result(self):
+        hand_ids = [
+            HandId.front,
+            HandId.middle,
+            HandId.back,
+        ]
+        h1 = self.game.hands[PlayerId.player_1]
+        h2 = self.game.hands[PlayerId.player_2]
+
+        score_h1, score_h2 = h1.score_versus(h2)
+        print()
+        for hand_id in hand_ids:
+            print(
+                f'{repr(h1.hands[hand_id]):15} '
+                f'{h1.strength[hand_id].rank.name:15} '
+                f'{h1.bonus[hand_id]} | '
+                f'{repr(h2.hands[hand_id]):15} '
+                f'{h2.strength[hand_id].rank.name:15} '
+                f'{h2.bonus[hand_id]}'
+            )
+        print('Scores:', score_h1, score_h2)
+        print('Difference:', score_h1 - score_h2)
+
+        return score_h1, score_h2
+
+    def run(self):
+        self.current_player = PlayerId.player_1
+        initial_hand_p1 = self.game.draw_five_cards()
+        play_ids = self._get_move(PlayerId.player_1, initial_hand_p1, True)
+        self.game.play(PlayerId.player_1, initial_hand_p1, play_ids)
+
+        self.current_player = PlayerId.player_2
+        initial_hand_p2 = self.game.draw_five_cards()
+        play_ids = self._get_move(PlayerId.player_2, initial_hand_p2, True)
+        self.game.play(PlayerId.player_2, initial_hand_p2, play_ids)
+
+        while any(
+                not hand.is_hand_complete()
+                for hand in self.game.hands.values()
+        ):
+            if self.current_player == PlayerId.player_1:
+                self.current_player = PlayerId.player_2
+            else:
+                self.current_player = PlayerId.player_1
+            print(self.current_player.name, 'turn')
+            hand = self.game.draw_three_cards()
+            play_ids = self._get_move(self.current_player, hand, False)
+            self.game.play(self.current_player, hand, play_ids)
+            print(self.game)
+
+        self._print_result()
+
 
 def generate_random_single_hand(n_cards):
     cards = []
@@ -549,5 +753,23 @@ def battle():
     print('Difference:', score_h1 - score_h2)
 
 
-battle()
+# battle()
 # test_hand_strength(5)
+game = Game()
+print(game)
+draw = game.draw_five_cards()
+game.play(
+    PlayerId.player_1,
+    draw,
+    (
+        PlayId.front,
+        PlayId.front,
+        PlayId.back,
+        PlayId.middle,
+        PlayId.middle,
+    )
+)
+print('#####################')
+print(game)
+
+loop = GameLoop()
