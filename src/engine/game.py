@@ -67,12 +67,12 @@ class SingleHand():
         return len(self.cards)
 
     def __repr__(self) -> str:
-        return ' '.join(str(card) for card in self.cards)
+        return ' '.join(str(card) for card in sorted(self.cards))
 
     def add_card(self, card: Card):
         self.cards.append(card)
 
-
+@total_ordering
 class SingleHandStrength():
     def __init__(self, hand: SingleHand):
         self.cards = sorted(hand.cards)
@@ -82,6 +82,19 @@ class SingleHandStrength():
 
     def __repr__(self) -> str:
         return f'{self.rank.name}, {self.val}'
+
+    def __eq__(self, other: object):
+        if not isinstance(other, SingleHandStrength):
+            raise NotImplementedError
+
+        return (self.rank, self.val) == (other.rank, other.val)
+
+    def __lt__(self, other: object):
+        if not isinstance(other, SingleHandStrength):
+            raise NotImplementedError
+
+        return (self.rank, self.val) < (other.rank, other.val)
+
 
     def _compute_strength(self) -> Tuple[HandRank, Union[int, Tuple[int, ...]]]:
         def is_flush() -> Tuple[bool, Tuple[int, ...]]:
@@ -310,6 +323,7 @@ class Hand():
         self.hands[HandId.middle] = SingleHand()
         self.hands[HandId.front] = SingleHand()
         self.strength = {}
+        self.bonus = {}
 
     def __repr__(self):
         return '\n'.join(
@@ -341,9 +355,50 @@ class Hand():
         for hand_id in HandId:
             self.strength[hand_id] = SingleHandStrength(self.hands[hand_id])
 
+    def is_foul(self):
+        if len(self.strength) == 0:
+            self._compute_strength()
+
+        return not (self.strength[HandId.front] <=
+                    self.strength[HandId.middle] <=
+                    self.strength[HandId.back])
+
     def compute_bonus(self):
+        self._check_hand_complete()
+
+        if len(self.strength) == 0:
+            self._compute_strength()
+
+        # Computing the bonus for the front hand
+        # front_hand_strength = self.strength[HandId.front]
+        # front_bonus_map = bonus_map[HandId.front].get(
+        #     front_hand_strength.rank,
+        #     0
+        # )
+        # if front_bonus_map == 0:
+        #     front_bonus = 0
+        # else:
+        #     hand_val = front_hand_strength.val
+        #     front_bonus = front_bonus_map.get(hand_val[0], 0)
+        # self.bonus[HandId.front] = front_bonus
+
+        # for hand_id in (HandId.middle, HandId.back):
         for hand_id in HandId:
-            print(hand_id)
+            hand_strength = self.strength[hand_id]
+            hand_bonus_map = bonus_map[hand_id].get(
+                hand_strength.rank,
+                0
+            )
+            if type(hand_bonus_map) == int:
+                bonus_value = hand_bonus_map
+            else:
+                hand_val = hand_strength.val
+
+                bonus_value = hand_bonus_map.get(
+                    hand_val[0] if type(hand_val) == tuple else hand_val,
+                    0
+                )
+            self.bonus[hand_id] = bonus_value
 
 # class Game():
 #     def __init__(self):
@@ -351,104 +406,6 @@ class Hand():
 #         p1_hand = Hand()
 #         p2_hand = Hand()
 
-hands = [
-    SingleHand([
-        Card(Suit.h, 'A'),
-        Card(Suit.h, 'K'),
-        Card(Suit.h, 'Q'),
-        Card(Suit.h, 'J'),
-        Card(Suit.h, 'T')
-    ]),
-    SingleHand([
-        Card(Suit.s, '6'),
-        Card(Suit.s, 'T'),
-        Card(Suit.s, '7'),
-        Card(Suit.s, '9'),
-        Card(Suit.s, '8')
-    ]),
-    SingleHand([
-        Card(Suit.c, '3'),
-        Card(Suit.h, '3'),
-        Card(Suit.s, '3'),
-        Card(Suit.s, '7'),
-        Card(Suit.d, '3')
-    ]),
-    SingleHand([
-        Card(Suit.c, 'K'),
-        Card(Suit.s, 'K'),
-        Card(Suit.h, 'K'),
-        Card(Suit.c, '5'),
-        Card(Suit.s, '5')
-    ]),
-    SingleHand([
-        Card(Suit.d, 'A'),
-        Card(Suit.d, 'T'),
-        Card(Suit.d, '7'),
-        Card(Suit.d, '8'),
-        Card(Suit.d, '4')
-    ]),
-    SingleHand([
-        Card(Suit.s, 'J'),
-        Card(Suit.c, '7'),
-        Card(Suit.c, 'T'),
-        Card(Suit.h, '8'),
-        Card(Suit.h, '9'),
-    ]),
-    SingleHand([
-        Card(Suit.c, 'A'),
-        Card(Suit.h, 'T'),
-        Card(Suit.h, '8'),
-        Card(Suit.c, '8'),
-        Card(Suit.s, '8')
-    ]),
-    SingleHand([
-        Card(Suit.d, '2'),
-        Card(Suit.c, 'T'),
-        Card(Suit.c, 'T'),
-        Card(Suit.s, '2'),
-        Card(Suit.c, '6')
-    ]),
-    SingleHand([
-        Card(Suit.c, '2'),
-        Card(Suit.c, '3'),
-        Card(Suit.d, 'A'),
-        Card(Suit.c, '4'),
-        Card(Suit.c, '5')
-    ]),
-    SingleHand([
-        Card(Suit.c, '2'),
-        Card(Suit.c, '3'),
-        Card(Suit.d, 'A'),
-        Card(Suit.c, '4'),
-        Card(Suit.s, '3')
-    ]),
-    SingleHand([
-        Card(Suit.c, '2'),
-        Card(Suit.c, '3'),
-        Card(Suit.d, '4'),
-        Card(Suit.c, '5'),
-        Card(Suit.s, '7')
-    ]),
-    SingleHand([
-        Card(Suit.c, '2'),
-        Card(Suit.s, '2'),
-        Card(Suit.d, '2'),
-    ]),
-    SingleHand([
-        Card(Suit.c, '2'),
-        Card(Suit.s, '2'),
-        Card(Suit.d, '3'),
-    ]),
-    SingleHand([
-        Card(Suit.c, 'Q'),
-        Card(Suit.s, '7'),
-        Card(Suit.d, 'A'),
-    ]),
-]
-
-for hand in hands:
-    strength = SingleHandStrength(hand)
-    print(hand, strength.rank, strength.val)
 
 def generate_random_single_hand(n_cards):
     cards = []
@@ -491,13 +448,19 @@ def test_hand_strength(n):
         HandId.back,
     ]
     for _ in range(n):
-        print('###############')
         h = generate_random_hand()
-        h._compute_strength()
+        # h._compute_strength()
+        h.compute_bonus()
+        if h.bonus[HandId.back] == 0 and h.bonus[HandId.middle] == 0:
+            continue
+        print('###############')
         for hand_id in hand_ids:
             print(f'{hand_id.name:7} '
                   f'{repr(h.hands[hand_id]):15} '
-                  f'{h.strength[hand_id]}')
+                  f'{repr(h.strength[hand_id]):30} '
+                  f'{h.bonus[hand_id]}')
+        print('Is foul?', h.is_foul())
+        h.compute_bonus()
 
-# h = generate_random_hand()
-test_hand_strength(5)
+
+test_hand_strength(1000)
