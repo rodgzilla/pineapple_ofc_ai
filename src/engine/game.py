@@ -343,14 +343,18 @@ class Hand():
 
         self.hands[hand_id].add_card(card)
 
-    def _check_hand_complete(self):
+    # def _check_hand_complete(self):
+    def is_hand_complete(self):
         for hand_id, hand in self.hands.items():
             if (hand_id == HandId.front and len(hand) != 3) or \
                (hand_id in (HandId.middle, HandId.back) and len(hand) != 5):
-                raise ValueError(f'Hand {hand_id.name} is incomplete')
+                return False
+
+        return True
 
     def _compute_strength(self):
-        self._check_hand_complete()
+        if not self.is_hand_complete():
+            raise ValueError('Hand is incomplete')
 
         for hand_id in HandId:
             self.strength[hand_id] = SingleHandStrength(self.hands[hand_id])
@@ -364,25 +368,12 @@ class Hand():
                     self.strength[HandId.back])
 
     def compute_bonus(self):
-        self._check_hand_complete()
+        if not self.is_hand_complete():
+            raise ValueError('Hand is incomplete')
 
         if len(self.strength) == 0:
             self._compute_strength()
 
-        # Computing the bonus for the front hand
-        # front_hand_strength = self.strength[HandId.front]
-        # front_bonus_map = bonus_map[HandId.front].get(
-        #     front_hand_strength.rank,
-        #     0
-        # )
-        # if front_bonus_map == 0:
-        #     front_bonus = 0
-        # else:
-        #     hand_val = front_hand_strength.val
-        #     front_bonus = front_bonus_map.get(hand_val[0], 0)
-        # self.bonus[HandId.front] = front_bonus
-
-        # for hand_id in (HandId.middle, HandId.back):
         for hand_id in HandId:
             hand_strength = self.strength[hand_id]
             hand_bonus_map = bonus_map[hand_id].get(
@@ -399,6 +390,44 @@ class Hand():
                     0
                 )
             self.bonus[hand_id] = bonus_value
+
+    def score_versus(self, other: Hand) -> Tuple[int, int]:
+        self_foul = self.is_foul()
+        other_foul = other.is_foul()
+
+        if self_foul and other_foul:
+            return -3, -3
+
+        self.compute_bonus()
+        other.compute_bonus()
+
+        battle_score_self = 0
+        battle_score_other = 0
+        for hand_id in HandId:
+            self_hand_strength = self.strength[hand_id]
+            other_hand_strength = other.strength[hand_id]
+
+            if self_hand_strength == other_hand_strength:
+                continue
+
+            if self_hand_strength < other_hand_strength:
+                battle_score_other += 1
+            else:
+                battle_score_self += 1
+
+        # total_self_score = 0
+        # total_other_score = 0
+        if self_foul:
+            total_self_score = -3
+        else:
+            total_self_score = battle_score_self + sum(self.bonus.values())
+
+        if other_foul:
+            total_other_score = -3
+        else:
+            total_other_score = battle_score_other + sum(other.bonus.values())
+
+        return total_self_score, total_other_score
 
 # class Game():
 #     def __init__(self):
@@ -451,8 +480,8 @@ def test_hand_strength(n):
         h = generate_random_hand()
         # h._compute_strength()
         h.compute_bonus()
-        if h.bonus[HandId.back] == 0 and h.bonus[HandId.middle] == 0:
-            continue
+        # if h.bonus[HandId.back] == 0 and h.bonus[HandId.middle] == 0:
+        #     continue
         print('###############')
         for hand_id in hand_ids:
             print(f'{hand_id.name:7} '
@@ -462,5 +491,41 @@ def test_hand_strength(n):
         print('Is foul?', h.is_foul())
         h.compute_bonus()
 
+def generate_non_fouling_hand():
+    while True:
+        h = generate_random_hand()
+        if not h.is_foul():
+            return h
 
-test_hand_strength(1000)
+
+def battle():
+    hand_ids = [
+        HandId.front,
+        HandId.middle,
+        HandId.back,
+    ]
+    h1 = generate_non_fouling_hand()
+    h2 = generate_non_fouling_hand()
+
+    print(h1)
+    print(h2)
+    print(h1.hands)
+    print(h1.strength)
+    print(h1.bonus)
+    score_h1, score_h2 = h1.score_versus(h2)
+    for hand_id in hand_ids:
+        print(
+            f'{hand_id.name:7} '
+            f'{repr(h1.hands[hand_id]):15} '
+            f'{h1.strength[hand_id].rank.name:15} '
+            f'{h1.bonus[hand_id]} | '
+            f'{repr(h2.hands[hand_id]):15} '
+            f'{h2.strength[hand_id].rank.name:15} '
+            f'{h2.bonus[hand_id]}'
+        )
+    print('Scores:', score_h1, score_h2)
+    print('Difference:', score_h1 - score_h2)
+
+
+battle()
+# test_hand_strength(5)
