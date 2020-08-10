@@ -1,14 +1,21 @@
-from typing import List, Tuple, Union, cast
+from typing import List, Tuple, Union, Optional, cast
 from enum import Enum, IntEnum, auto
 from functools import total_ordering
 from collections import Counter, defaultdict
 import random
+
 
 class Suit(Enum):
     d = auto()
     c = auto()
     s = auto()
     h = auto()
+
+
+class HandId(Enum):
+    front = auto()
+    middle = auto()
+    back = auto()
 
 
 class HandRank(IntEnum):
@@ -21,6 +28,7 @@ class HandRank(IntEnum):
     FULL_HOUSE = 6
     FOUR_OF_A_KIND = 7
     STRAIGHT_FLUSH = 8
+
 
 @total_ordering
 class Card:
@@ -47,9 +55,13 @@ class Card:
 
         return c1 < c2
 
+
 class SingleHand():
-    def __init__(self, cards: List[Card] = []):
-        self.cards = cards
+    def __init__(self, cards: Optional[List[Card]] = None):
+        if cards is None:
+            self.cards = []
+        else:
+            self.cards = cards
 
     def __len__(self) -> int:
         return len(self.cards)
@@ -60,13 +72,16 @@ class SingleHand():
     def add_card(self, card: Card):
         self.cards.append(card)
 
+
 class SingleHandStrength():
     def __init__(self, hand: SingleHand):
-        # self.hand = hand
         self.cards = sorted(hand.cards)
         self.suit_counter = Counter(card.suit for card in self.cards)
         self.height_counter = Counter(card.int_height for card in self.cards)
         self.rank, self.val = self._compute_strength()
+
+    def __repr__(self) -> str:
+        return f'{self.rank.name}, {self.val}'
 
     def _compute_strength(self) -> Tuple[HandRank, Union[int, Tuple[int, ...]]]:
         def is_flush() -> Tuple[bool, Tuple[int, ...]]:
@@ -214,12 +229,121 @@ class SingleHandStrength():
 
         return HandRank.HIGH_CARD, high_card_value
 
+bonus_map = {
+    HandId.back: {
+        HandRank.STRAIGHT_FLUSH: {
+            12: 25,
+            11: 15,
+            10: 15,
+            9: 15,
+            8: 15,
+            7: 15,
+            6: 15,
+            5: 15,
+            4: 15,
+            3: 15,
+        },
+        HandRank.FOUR_OF_A_KIND: 10,
+        HandRank.FULL_HOUSE: 6,
+        HandRank.FLUSH: 4,
+        HandRank.STRAIGHT: 2
+    },
+    HandId.middle: {
+        HandRank.STRAIGHT_FLUSH: {
+            12: 50,
+            11: 30,
+            10: 30,
+            9: 30,
+            8: 30,
+            7: 30,
+            6: 30,
+            5: 30,
+            4: 30,
+            3: 30,
+        },
+        HandRank.FOUR_OF_A_KIND: 20,
+        HandRank.FULL_HOUSE: 12,
+        HandRank.FLUSH: 8,
+        HandRank.STRAIGHT: 4,
+        HandRank.THREE_OF_A_KIND: 2
+    },
+    HandId.front: {
+        HandRank.THREE_OF_A_KIND: {
+            12: 22,
+            11: 21,
+            10: 20,
+            9: 19,
+            8: 18,
+            7: 17,
+            6: 16,
+            5: 15,
+            4: 14,
+            3: 13,
+            2: 12,
+            1: 11,
+            0: 10,
+        },
+        HandRank.ONE_PAIR: {
+            12: 9,
+            11: 8,
+            10: 7,
+            9: 6,
+            8: 5,
+            7: 4,
+            6: 3,
+            5: 2,
+            4: 1,
+        }
+    }
+}
+
+
 
 class Hand():
     def __init__(self):
-        self.back = SingleHand()
-        self.middle = SingleHand()
-        self.front = SingleHand()
+        # self.hands = {
+        #     hand_id: SingleHand()
+        #     for hand_id in HandId
+        # }
+        self.hands = {}
+        self.hands[HandId.back] = SingleHand()
+        self.hands[HandId.middle] = SingleHand()
+        self.hands[HandId.front] = SingleHand()
+        self.strength = {}
+
+    def __repr__(self):
+        return '\n'.join(
+            repr(self.hands[hand_id])
+            for hand_id in [
+                    HandId.front,
+                    HandId.middle,
+                    HandId.back
+            ]
+        )
+
+    def add_card(self, hand_id: HandId, card: Card):
+        if (hand_id == HandId.front and len(self.hands[hand_id]) == 3) or \
+           (hand_id in (HandId.middle, HandId.back) and
+            len(self.hands[hand_id]) == 5):
+            raise ValueError(f'Hand {hand_id} is full')
+
+        self.hands[hand_id].add_card(card)
+
+    def _check_hand_complete(self):
+        for hand_id, hand in self.hands.items():
+            if (hand_id == HandId.front and len(hand) != 3) or \
+               (hand_id in (HandId.middle, HandId.back) and len(hand) != 5):
+                raise ValueError(f'Hand {hand_id.name} is incomplete')
+
+    def _compute_strength(self):
+        self._check_hand_complete()
+
+        for hand_id in HandId:
+            self.strength[hand_id] = SingleHandStrength(self.hands[hand_id])
+
+    def compute_bonus(self):
+        for hand_id in HandId:
+            print(hand_id)
 
 # class Game():
 #     def __init__(self):
@@ -326,7 +450,7 @@ for hand in hands:
     strength = SingleHandStrength(hand)
     print(hand, strength.rank, strength.val)
 
-def generate_random_hand(n_cards):
+def generate_random_single_hand(n_cards):
     cards = []
 
     while len(cards) < n_cards:
@@ -338,20 +462,42 @@ def generate_random_hand(n_cards):
 
     return SingleHand(cards)
 
-for _ in range(10):
-    hand = generate_random_hand(5)
-    strength = SingleHandStrength(hand)
-    print(sorted(hand.cards), strength.rank, strength.val)
+def generate_random_hand():
+    hand = Hand()
+    hand_ids = list(HandId)
+    hand_ids_to_card_number = {
+        HandId.back: 5,
+        HandId.middle: 5,
+        HandId.front: 3,
+    }
 
-n = 50000
-hand_by_rank = defaultdict(list)
-for _ in range(n):
-    hand = generate_random_hand(5)
-    strength = SingleHandStrength(hand)
-    hand_by_rank[strength.rank].append((hand, strength.val))
+    for i, hand_id in enumerate(hand_ids):
+        while len(hand.hands[hand_id]) < hand_ids_to_card_number[hand_id]:
+            suit = random.choice(list(Suit))
+            height = random.choice('23456789TJQKA')
+            card = Card(suit, height)
+            for j in range(i + 1):
+                if card in hand.hands[hand_ids[j]].cards:
+                    break
+            else:
+                hand.add_card(hand_id, card)
 
-for rank, hands in hand_by_rank.items():
-    print(rank, len(hands), len(hands) / n)
+    return hand
 
-# for hand in hands:
-#     SingleHandStrength(hand)
+def test_hand_strength(n):
+    hand_ids = [
+        HandId.front,
+        HandId.middle,
+        HandId.back,
+    ]
+    for _ in range(n):
+        print('###############')
+        h = generate_random_hand()
+        h._compute_strength()
+        for hand_id in hand_ids:
+            print(f'{hand_id.name:7} '
+                  f'{repr(h.hands[hand_id]):15} '
+                  f'{h.strength[hand_id]}')
+
+# h = generate_random_hand()
+test_hand_strength(5)
