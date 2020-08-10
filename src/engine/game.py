@@ -395,36 +395,54 @@ class Hand():
         self_foul = self.is_foul()
         other_foul = other.is_foul()
 
-        if self_foul and other_foul:
-            return -3, -3
-
         self.compute_bonus()
         other.compute_bonus()
 
+        # If both players foul their hand, no one scores points
+        if self_foul and other_foul:
+            return 0, 0
+
+        # Hand to hand battles
         battle_score_self = 0
         battle_score_other = 0
         for hand_id in HandId:
             self_hand_strength = self.strength[hand_id]
             other_hand_strength = other.strength[hand_id]
 
-            if self_hand_strength == other_hand_strength:
-                continue
+            # if self_hand_strength == other_hand_strength:
+            #     continue
 
-            if self_hand_strength < other_hand_strength:
+            if self_foul or \
+               (not other_foul and other_hand_strength > self_hand_strength):
                 battle_score_other += 1
-            else:
+            elif other_foul or \
+                 (not self_foul and self_hand_strength > other_hand_strength):
                 battle_score_self += 1
 
-        # total_self_score = 0
-        # total_other_score = 0
-        if self_foul:
-            total_self_score = -3
-        else:
+        # Scooping happens when a player wins all the hand battles
+        if battle_score_self == 3:
+            battle_score_self += 3
+
+        if battle_score_other == 3:
+            battle_score_other += 3
+
+        # If a player fouls his hand, he gets a three point
+        # penalty. Otherwise, his score is the sum of its hand to hand
+        # battle score and its royalties
+        # if self_foul:
+        #     total_self_score = -3
+        # else:
+        #     total_self_score = battle_score_self + sum(self.bonus.values())
+        total_self_score = 0
+        total_other_score = 0
+        if not self_foul:
             total_self_score = battle_score_self + sum(self.bonus.values())
 
-        if other_foul:
-            total_other_score = -3
-        else:
+        # if other_foul:
+        #     total_other_score = -3
+        # else:
+        #     total_other_score = battle_score_other + sum(other.bonus.values())
+        if not other_foul:
             total_other_score = battle_score_other + sum(other.bonus.values())
 
         return total_self_score, total_other_score
@@ -504,18 +522,15 @@ def battle():
         HandId.middle,
         HandId.back,
     ]
-    h1 = generate_non_fouling_hand()
-    h2 = generate_non_fouling_hand()
+    h1 = generate_random_hand()
+    h2 = generate_random_hand()
+    # h1 = generate_non_fouling_hand()
+    # h2 = generate_non_fouling_hand()
 
-    print(h1)
-    print(h2)
-    print(h1.hands)
-    print(h1.strength)
-    print(h1.bonus)
     score_h1, score_h2 = h1.score_versus(h2)
+    print()
     for hand_id in hand_ids:
         print(
-            f'{hand_id.name:7} '
             f'{repr(h1.hands[hand_id]):15} '
             f'{h1.strength[hand_id].rank.name:15} '
             f'{h1.bonus[hand_id]} | '
