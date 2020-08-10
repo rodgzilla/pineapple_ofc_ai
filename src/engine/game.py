@@ -1,7 +1,7 @@
 from typing import List, Tuple, Union, Optional, cast
 from enum import Enum, IntEnum, auto
 from functools import total_ordering
-from collections import Counter, defaultdict
+from collections import Counter
 import random
 
 
@@ -55,6 +55,26 @@ class Card:
 
         return c1 < c2
 
+class CardDeck():
+    def __init__(self):
+        self.cards = [
+            Card(suit, height)
+            for suit in Suit
+            for height in '23456789TJQKA'
+        ]
+        random.shuffle(self.cards)
+
+    def __repr__(self) -> str:
+        return ' '.join(repr(card) for card in self.cards)
+
+    def __len__(self) -> int:
+        return len(self.cards)
+
+    def draw_card(self) -> Card:
+        if len(self) == 0:
+            raise ValueError('The deck is empty.')
+
+        return self.cards.pop(0)
 
 class SingleHand():
     def __init__(self, cards: Optional[List[Card]] = None):
@@ -409,9 +429,6 @@ class Hand():
             self_hand_strength = self.strength[hand_id]
             other_hand_strength = other.strength[hand_id]
 
-            # if self_hand_strength == other_hand_strength:
-            #     continue
-
             if self_foul or \
                (not other_foul and other_hand_strength > self_hand_strength):
                 battle_score_other += 1
@@ -429,19 +446,11 @@ class Hand():
         # If a player fouls his hand, he gets a three point
         # penalty. Otherwise, his score is the sum of its hand to hand
         # battle score and its royalties
-        # if self_foul:
-        #     total_self_score = -3
-        # else:
-        #     total_self_score = battle_score_self + sum(self.bonus.values())
         total_self_score = 0
         total_other_score = 0
         if not self_foul:
             total_self_score = battle_score_self + sum(self.bonus.values())
 
-        # if other_foul:
-        #     total_other_score = -3
-        # else:
-        #     total_other_score = battle_score_other + sum(other.bonus.values())
         if not other_foul:
             total_other_score = battle_score_other + sum(other.bonus.values())
 
@@ -452,7 +461,6 @@ class Hand():
 #         print('salut')
 #         p1_hand = Hand()
 #         p2_hand = Hand()
-
 
 def generate_random_single_hand(n_cards):
     cards = []
@@ -496,7 +504,6 @@ def test_hand_strength(n):
     ]
     for _ in range(n):
         h = generate_random_hand()
-        # h._compute_strength()
         h.compute_bonus()
         # if h.bonus[HandId.back] == 0 and h.bonus[HandId.middle] == 0:
         #     continue
