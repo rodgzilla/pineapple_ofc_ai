@@ -1,5 +1,5 @@
 import pdb
-from typing import List, Tuple, Union, Optional, cast
+from typing import List, Tuple, Union, Optional, cast, DefaultDict
 from enum import Enum, IntEnum, auto
 from functools import total_ordering
 from collections import Counter, defaultdict
@@ -696,10 +696,34 @@ class RandomPlayer(Player):
 
 
 class MonteCarloPlayer(Player):
-    def __init__(self, n_run: int):
+    def __init__(self, player_id: PlayerId, n_run: int):
         self.n_run                      = n_run
+        self.selecting_function         = max if player_id == PlayerId.player_1 else min
         self.possible_initial_plays     = generate_initial_plays()
         self.possible_non_initial_plays = generate_non_initial_plays()
+
+    def _select_play_based_on_outcomes(
+            self,
+            play_to_outcomes: DefaultDict[
+                Tuple[PlayId, ...],
+                List[Tuple[int, int]]
+            ]
+    ) -> Tuple[PlayId, ...]:
+        play_to_mean_diff = {
+            play: (
+                sum(
+                    score_1 - score_2
+                    for score_1, score_2 in outcomes
+                ) / len(outcomes)
+            )
+            for play, outcomes in play_to_outcomes.items ()
+        }
+
+        res = self.selecting_function(
+            play_to_mean_diff.items(),
+            key = lambda x: x[1]
+        )
+        return res[0]
 
     def get_play(
             self,
@@ -708,7 +732,11 @@ class MonteCarloPlayer(Player):
             cards     : List[Card],
             initial   : bool
     ) -> Tuple[PlayId, ...]:
-        play_to_outcomes = defaultdict(list)
+        print('Finding solution for:', cards)
+        play_to_outcomes: DefaultDict[
+            Tuple[PlayId, ...],
+            List[Tuple[int, int]]
+        ] = defaultdict(list)
         plays            = (
             self.possible_initial_plays
             if initial else
@@ -741,11 +769,14 @@ class MonteCarloPlayer(Player):
                 verbose  = False
             )
             outcome = random_game_loop.run()
-        return plays[0]
+            play_to_outcomes[play_to_explore].append(outcome)
+
+        selected_play = self._select_play_based_on_outcomes(play_to_outcomes)
+
+        return selected_play
 
 
 class GameLoop():
-    # def __init__(self, cards: Optional[List[Card]] = None):
     def __init__(
             self,
             player_1: Player,
@@ -760,14 +791,8 @@ class GameLoop():
         if game is None:
             self.game = Game()
         else:
-            self.game = Game()
-        self.verbose = verbose
-        # self.char_to_play_id = {
-        #     'B': PlayId.back,
-        #     'M': PlayId.middle,
-        #     'F': PlayId.front,
-        #     'D': PlayId.discard,
-        # }
+            self.game = game
+        self.verbose         = verbose
         self.current_player  = PlayerId.player_1
 
     def _compute_and_print_result(self):
@@ -797,25 +822,35 @@ class GameLoop():
         return score_h1, score_h2
 
     def run(self):
-        self.current_player = PlayerId.player_1
-        initial_hand_p1     = self.game.draw_five_cards()
-        play_ids            = self.players[PlayerId.player_1].get_play(
-            game      = self.game,
-            player_id = PlayerId.player_1,
-            cards     = initial_hand_p1,
-            initial   = True
-        )
-        self.game.play(PlayerId.player_1, initial_hand_p1, play_ids)
+        if len(self.game.hands[PlayerId.player_1]) == 0:
+            if self.verbose:
+                print('Player 1 to play')
+            self.current_player = PlayerId.player_1
+            initial_hand_p1     = self.game.draw_five_cards()
+            play_ids            = self.players[PlayerId.player_1].get_play(
+                game      = self.game,
+                player_id = PlayerId.player_1,
+                cards     = initial_hand_p1,
+                initial   = True
+            )
+            self.game.play(PlayerId.player_1, initial_hand_p1, play_ids)
+            if self.verbose:
+                print(self.game)
 
-        self.current_player = PlayerId.player_2
-        initial_hand_p2     = self.game.draw_five_cards()
-        play_ids            = self.players[PlayerId.player_1].get_play(
-            game      = self.game,
-            player_id = PlayerId.player_2,
-            cards     = initial_hand_p2,
-            initial   = True
-        )
-        self.game.play(PlayerId.player_2, initial_hand_p2, play_ids)
+        if len(self.game.hands[PlayerId.player_2]) == 0:
+            if self.verbose:
+                print('Player 2 to play')
+            self.current_player = PlayerId.player_2
+            initial_hand_p2     = self.game.draw_five_cards()
+            play_ids            = self.players[PlayerId.player_2].get_play(
+                game      = self.game,
+                player_id = PlayerId.player_2,
+                cards     = initial_hand_p2,
+                initial   = True
+            )
+            self.game.play(PlayerId.player_2, initial_hand_p2, play_ids)
+            if self.verbose:
+                print(self.game)
 
         while any(
                 not hand.is_hand_complete()
@@ -906,7 +941,12 @@ class GameLoop():
 # player_2 = HumanPlayer()
 # loop = GameLoop(player_1, player_2)
 # mc_player = MonteCarloPlayer(20)
+# loop = GameLoop(
+#     MonteCarloPlayer(100),
+#     HumanPlayer()
+# )
+
 loop = GameLoop(
-    MonteCarloPlayer(20),
-    HumanPlayer()
+    MonteCarloPlayer(PlayerId.player_1, 10000),
+    MonteCarloPlayer(PlayerId.player_2, 10000),
 )
