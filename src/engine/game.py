@@ -3,7 +3,9 @@ from typing import List, Tuple, Union, Optional, cast
 from enum import Enum, IntEnum, auto
 from functools import total_ordering
 from collections import Counter, defaultdict
+import copy
 import random
+from abc import ABC, abstractmethod
 
 
 class Suit(Enum):
@@ -351,7 +353,6 @@ bonus_map = {
 }
 
 
-
 class Hand():
     def __init__(self):
         # self.hands = {
@@ -433,7 +434,7 @@ class Hand():
                 )
             self.bonus[hand_id] = bonus_value
 
-    def score_versus(self, other: Hand) -> Tuple[int, int]:
+    def score_versus(self, other: 'Hand') -> Tuple[int, int]:
         self_foul = self.is_foul()
         other_foul = other.is_foul()
 
@@ -491,9 +492,9 @@ class Game():
 
     def __repr__(self) -> str:
         return (
-            '#######\n'
-            'Deck\n'
-            f'{self.deck}\n'
+        #     '#######\n'
+        #     'Deck\n'
+        #     f'{self.deck}\n'
             '#######\n'
             'Player 1 hand\n'
             f'{self.hands[PlayerId.player_1]}\n'
@@ -501,9 +502,9 @@ class Game():
             'Player 2 hand\n'
             f'{self.hands[PlayerId.player_2]}\n'
             '#######\n'
-            'Discarded cards\n'
-            f'Player 1: {self.discarded_cards[PlayerId.player_1]}\n'
-            f'Player 2: {self.discarded_cards[PlayerId.player_2]}'
+            # 'Discarded cards\n'
+            # f'Player 1: {self.discarded_cards[PlayerId.player_1]}\n'
+            # f'Player 2: {self.discarded_cards[PlayerId.player_2]}'
         )
 
     def _draw_n_cards(self, n: int) -> Tuple[Card, ...]:
@@ -579,7 +580,69 @@ class Game():
             else:
                 hand.hands[play_id_to_hand_id[position]].add_card(card)
 
-class GameLoop():
+class MonteCarloBot():
+    def __init__(self, game):
+        self.game = copy.deepcopy(game)
+
+    def _list_possible_moves(self):
+        pass
+
+class Player(ABC):
+    @abstractmethod
+    def get_move(
+            self,
+            game: Game,
+            player_id: PlayerId,
+            cards: List[Card],
+            initial: bool
+    ) -> List[PlayId]:
+        raise NotImplementedError
+
+class HumanPlayer(Player):
+    def __init__(self):
+        self.char_to_play_id = {
+            'B': PlayId.back,
+            'M': PlayId.middle,
+            'F': PlayId.front,
+            'D': PlayId.discard,
+        }
+
+    def _convert_str_to_play_ids(self, s: str) -> List[PlayId]:
+        return [
+            self.char_to_play_id[c]
+            for c in s
+        ]
+
+    def get_move(
+            self,
+            game: Game,
+            player_id: PlayerId,
+            cards: List[Card],
+            initial: bool
+    ) -> List[PlayId]:
+        hand = self.game.hands[player_id]
+        play_str = 'DDDDD'
+        play_ids = self._convert_str_to_play_ids(play_str)
+
+        while not self.game.is_valid_play(player_id, cards, play_ids):
+            if len(hand) != 0:
+                print(hand)
+            print('Your cards:', cards)
+            play_str = input(
+                'Your play (BMF):'
+                if initial else
+                'Your play (BMFD):'
+            ).upper()
+            if any(play_char not in 'BMFD' for play_char in play_str):
+                print('All moves must be in BMFD')
+                continue
+            play_ids = self._convert_str_to_play_ids(play_str)
+
+        return play_ids
+
+
+class GameLoopHumanHuman():
+    # def __init__(self, player_1: Player, player_2: Player):
     def __init__(self):
         self.game = Game()
         self.char_to_play_id = {
@@ -613,7 +676,7 @@ class GameLoop():
 
         return play_ids
 
-    def _print_result(self):
+    def _compute_and_print_result(self):
         hand_ids = [
             HandId.front,
             HandId.middle,
@@ -663,7 +726,95 @@ class GameLoop():
             self.game.play(self.current_player, hand, play_ids)
             print(self.game)
 
-        self._print_result()
+        return self._compute_and_print_result()
+
+
+class GameLoopHumanAI():
+    def __init__(self, human_player: PlayerId):
+        self.game = Game()
+        self.char_to_play_id = {
+            'B': PlayId.back,
+            'M': PlayId.middle,
+            'F': PlayId.front,
+            'D': PlayId.discard,
+        }
+        self.current_player = PlayerId.player_1
+        self.human_player = human_player
+
+    def _get_move(self, player_id: PlayerId, cards: List[Card], initial: bool) -> List[PlayId]:
+        def convert_str_to_play_ids(s: str) -> List[PlayId]:
+            return [
+                self.char_to_play_id[c]
+                for c in s
+            ]
+
+        hand = self.game.hands[player_id]
+        play_str = 'DDDDD'
+        play_ids = convert_str_to_play_ids(play_str)
+
+        while not self.game.is_valid_play(player_id, cards, play_ids):
+            if len(hand) != 0:
+                print(hand)
+            print('Your cards:', cards)
+            play_str = input('Your play (BMF):' if initial else 'Your play (BMFD):').upper()
+            if any(play_char not in 'BMFD' for play_char in play_str):
+                print('All moves must be in BMFD')
+                continue
+            play_ids = convert_str_to_play_ids(play_str)
+
+        return play_ids
+
+    def _compute_and_print_result(self):
+        hand_ids = [
+            HandId.front,
+            HandId.middle,
+            HandId.back,
+        ]
+        h1 = self.game.hands[PlayerId.player_1]
+        h2 = self.game.hands[PlayerId.player_2]
+
+        score_h1, score_h2 = h1.score_versus(h2)
+        print()
+        for hand_id in hand_ids:
+            print(
+                f'{repr(h1.hands[hand_id]):15} '
+                f'{h1.strength[hand_id].rank.name:15} '
+                f'{h1.bonus[hand_id]} | '
+                f'{repr(h2.hands[hand_id]):15} '
+                f'{h2.strength[hand_id].rank.name:15} '
+                f'{h2.bonus[hand_id]}'
+            )
+        print('Scores:', score_h1, score_h2)
+        print('Difference:', score_h1 - score_h2)
+
+        return score_h1, score_h2
+
+    def run(self):
+        self.current_player = PlayerId.player_1
+        initial_hand_p1 = self.game.draw_five_cards()
+        play_ids = self._get_move(PlayerId.player_1, initial_hand_p1, True)
+        self.game.play(PlayerId.player_1, initial_hand_p1, play_ids)
+
+        self.current_player = PlayerId.player_2
+        initial_hand_p2 = self.game.draw_five_cards()
+        play_ids = self._get_move(PlayerId.player_2, initial_hand_p2, True)
+        self.game.play(PlayerId.player_2, initial_hand_p2, play_ids)
+
+        while any(
+                not hand.is_hand_complete()
+                for hand in self.game.hands.values()
+        ):
+            if self.current_player == PlayerId.player_1:
+                self.current_player = PlayerId.player_2
+            else:
+                self.current_player = PlayerId.player_1
+            print(self.current_player.name, 'turn')
+            hand = self.game.draw_three_cards()
+            play_ids = self._get_move(self.current_player, hand, False)
+            self.game.play(self.current_player, hand, play_ids)
+            print(self.game)
+
+        return self._compute_and_print_result()
 
 
 def generate_random_single_hand(n_cards):
@@ -772,4 +923,4 @@ game.play(
 print('#####################')
 print(game)
 
-loop = GameLoop()
+loop = GameLoopHumanHuman()
