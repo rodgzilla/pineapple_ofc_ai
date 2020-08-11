@@ -696,9 +696,11 @@ class RandomPlayer(Player):
 
 
 class MonteCarloPlayer(Player):
-    def __init__(self, player_id: PlayerId, n_run: int):
+    # def __init__(self, cards: Optional[List[Card]] = None):
+    def __init__(self, player_id: PlayerId, n_run: int, cheating: Optional[bool] = False):
         self.n_run                      = n_run
         self.selecting_function         = max if player_id == PlayerId.player_1 else min
+        self.cheating                   = cheating
         self.possible_initial_plays     = generate_initial_plays()
         self.possible_non_initial_plays = generate_non_initial_plays()
 
@@ -761,7 +763,8 @@ class MonteCarloPlayer(Player):
                 cards     = cards,
                 play_ids  = play_to_explore
             )
-            current_game.deck.reshuffle()
+            if not self.cheating:
+                current_game.deck.reshuffle()
             random_game_loop = GameLoop(
                 player_1 = RandomPlayer(),
                 player_2 = RandomPlayer(),
@@ -910,26 +913,6 @@ class GameLoop():
 
 #     return hand
 
-# def test_hand_strength(n):
-#     hand_ids = [
-#         HandId.front,
-#         HandId.middle,
-#         HandId.back,
-#     ]
-#     for _ in range(n):
-#         h = generate_random_hand()
-#         h.compute_bonus()
-#         # if h.bonus[HandId.back] == 0 and h.bonus[HandId.middle] == 0:
-#         #     continue
-#         print('###############')
-#         for hand_id in hand_ids:
-#             print(f'{hand_id.name:7} '
-#                   f'{repr(h.hands[hand_id]):15} '
-#                   f'{repr(h.strength[hand_id]):30} '
-#                   f'{h.bonus[hand_id]}')
-#         print('Is foul?', h.is_foul())
-#         h.compute_bonus()
-
 # def generate_non_fouling_hand():
 #     while True:
 #         h = generate_random_hand()
@@ -947,6 +930,15 @@ class GameLoop():
 # )
 
 loop = GameLoop(
-    MonteCarloPlayer(PlayerId.player_1, 10000),
-    MonteCarloPlayer(PlayerId.player_2, 10000),
+    MonteCarloPlayer(
+        player_id = PlayerId.player_1,
+        n_run     = 10000,
+        cheating  = False
+    ),
+    HumanPlayer(),
+    # MonteCarloPlayer(
+    #     player_id = PlayerId.player_2,
+    #     n_run     = 10000,
+    #     cheating  = False
+    # ),
 )
