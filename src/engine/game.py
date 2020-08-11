@@ -642,8 +642,7 @@ class HumanPlayer(Player):
 
 
 class GameLoopHumanHuman():
-    # def __init__(self, player_1: Player, player_2: Player):
-    def __init__(self):
+    def __init__(self, player_1: Player, player_2: Player):
         self.game = Game()
         self.char_to_play_id = {
             'B': PlayId.back,
@@ -923,4 +922,6 @@ game.play(
 print('#####################')
 print(game)
 
-loop = GameLoopHumanHuman()
+player_1 = HumanPlayer()
+player_2 = HumanPlayer()
+loop = GameLoopHumanHuman(player_1, player_2)
