@@ -704,7 +704,9 @@ class MonteCarloPlayer(Player):
         self.cheating                   = cheating
         self.possible_initial_plays     = generate_initial_plays()
         self.possible_non_initial_plays = generate_non_initial_plays()
+        # Parallelism code
         # self.pool                       = multiprocessing.Pool(2)
+        # self.common_params              = {}
 
     def _select_play_based_on_outcomes(
             self,
@@ -731,14 +733,19 @@ class MonteCarloPlayer(Player):
 
     # def _compute_run_result(
     #         self,
-    #         game: Game,
-    #         cards: List[Card],
-    #         player_id: PlayerId,
-    #         plays: List[Tuple[PlayId, ...]],
+    #         run_id: int
+    #         # game: Game,
+    #         # cards: List[Card],
+    #         # player_id: PlayerId,
+    #         # plays: List[Tuple[PlayId, ...]],
     # ) -> Tuple[
     #     Tuple[PlayId, ...],
     #     Tuple[int, int]
     # ]:
+    #     game            = self.common_params['game']
+    #     cards           = self.common_params['cards']
+    #     player_id       = self.common_params['player_id']
+    #     plays           = self.common_params['plays']
     #     current_game    = copy.deepcopy(game)
     #     play_to_explore = random.choice(plays)
     #     current_game.play(
@@ -765,7 +772,6 @@ class MonteCarloPlayer(Player):
             cards     : List[Card],
             initial   : bool
     ) -> Tuple[PlayId, ...]:
-        # print('Finding solution for:', cards)
         play_to_outcomes: DefaultDict[
             Tuple[PlayId, ...],
             List[Tuple[int, int]]
@@ -785,6 +791,26 @@ class MonteCarloPlayer(Player):
                     play
             )
         ]
+
+        # game            = self.common_params['game']
+        # cards           = self.common_params['cards']
+        # player_id       = self.common_params['player_id']
+        # plays           = self.common_params['plays']
+
+        # self.common_params = {
+        #     'game': game,
+        #     'cards': cards,
+        #     'player_id': player_id,
+        #     'plays': plays
+        # }
+
+        # result = self.pool.map(
+        #     self._compute_run_result,
+        #     range(self.n_run)
+        # )
+
+        # for play, outcome in result:
+        #     play_to_outcomes[play].append(outcome)
 
         for _ in range(self.n_run):
             current_game = copy.deepcopy(game)
@@ -931,7 +957,7 @@ class FullGame():
         }
 
     def run(self):
-        while all(stack <= 0 for stack in self.stacks.values()):
+        while all(stack >= 0 for stack in self.stacks.values()):
             round_loop = GameLoop(
                 self.players[PlayerId.player_1],
                 self.players[PlayerId.player_2],
@@ -1023,7 +1049,7 @@ class FullGame():
 full_game = FullGame(
     player_1 = MonteCarloPlayer(
         player_id = PlayerId.player_1,
-        n_run     = 25000,
+        n_run     = 500,
         cheating  = False
     ),
     player_2 = HumanPlayer(),
