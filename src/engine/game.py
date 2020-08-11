@@ -734,7 +734,7 @@ class MonteCarloPlayer(Player):
             cards     : List[Card],
             initial   : bool
     ) -> Tuple[PlayId, ...]:
-        print('Finding solution for:', cards)
+        # print('Finding solution for:', cards)
         play_to_outcomes: DefaultDict[
             Tuple[PlayId, ...],
             List[Tuple[int, int]]
@@ -775,6 +775,10 @@ class MonteCarloPlayer(Player):
             play_to_outcomes[play_to_explore].append(outcome)
 
         selected_play = self._select_play_based_on_outcomes(play_to_outcomes)
+        for card, play_id in zip(cards, selected_play):
+            if play_id == PlayId.discard:
+                continue
+            print(f'Playing {card} to {play_id.name}')
 
         return selected_play
 
@@ -879,6 +883,51 @@ class GameLoop():
         return self._compute_and_print_result()
 
 
+class FullGame():
+    def __init__ (
+            self,
+            player_1: Player,
+            player_2: Player,
+            starting_stack: int
+    ):
+        self.players = {
+            PlayerId.player_1: player_1,
+            PlayerId.player_2: player_2,
+        }
+        self.stacks = {
+            player_id: starting_stack
+            for player_id in PlayerId
+        }
+
+    def run(self):
+        while all(stack != 0 for stack in self.stacks.values()):
+            round_loop = GameLoop(
+                self.players[PlayerId.player_1],
+                self.players[PlayerId.player_2],
+            )
+            score_p1, score_p2 = round_loop.run()
+            diff = score_p1 - score_p2
+
+            if diff != 0:
+                if diff > 0:
+                    winner = PlayerId.player_1
+                    loser = PlayerId.player_2
+                else:
+                    winner = PlayerId.player_2
+                    loser = PlayerId.player_1
+
+                self.stacks[winner] += diff
+                self.stacks[loser] -= diff
+
+            print(
+                '########################################\n'
+                f'Round result P1: {score_p1}, P2: {score_p2}, Difference: {diff}\n'
+                f'Stack player 1: {self.stacks[PlayerId.player_1]}\n'
+                f'Stack player 2: {self.stacks[PlayerId.player_1]}\n'
+                '########################################'
+            )
+
+
 # def generate_random_single_hand(n_cards):
 #     cards = []
 
@@ -929,16 +978,23 @@ class GameLoop():
 #     HumanPlayer()
 # )
 
-loop = GameLoop(
-    MonteCarloPlayer(
+# loop = GameLoop(
+#     MonteCarloPlayer(
+#         player_id = PlayerId.player_1,
+#         n_run     = 20000,
+#         # n_run     = 50,
+#         cheating  = False
+#     ),
+#     HumanPlayer(),
+# )
+
+full_game = FullGame(
+    player_1 = MonteCarloPlayer(
         player_id = PlayerId.player_1,
-        n_run     = 10000,
+        n_run     = 25000,
         cheating  = False
     ),
-    HumanPlayer(),
-    # MonteCarloPlayer(
-    #     player_id = PlayerId.player_2,
-    #     n_run     = 10000,
-    #     cheating  = False
-    # ),
+    player_2 = HumanPlayer(),
+    starting_stack = 50
 )
+full_game.run()
