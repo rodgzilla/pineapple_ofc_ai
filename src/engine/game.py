@@ -1049,7 +1049,7 @@ class FullGame():
 full_game = FullGame(
     player_1 = MonteCarloPlayer(
         player_id = PlayerId.player_1,
-        n_run     = 500,
+        n_run     = 20000,
         cheating  = False
     ),
     player_2 = HumanPlayer(),
