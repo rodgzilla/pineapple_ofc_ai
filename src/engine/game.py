@@ -526,7 +526,7 @@ class Game():
             self,
             player_id : PlayerId,
             cards     : List[Card],
-            play_ids  : List[PlayId]
+            play_ids  : Tuple[PlayId, ...]
     ) -> bool:
         if len(cards) != len(play_ids):
             return False
@@ -571,7 +571,7 @@ class Game():
             self,
             player_id : PlayerId,
             cards     : List[Card],
-            play_ids  : List[PlayId]
+            play_ids  : Tuple[PlayId, ...]
     ):
         if not self.is_valid_play(player_id, cards, play_ids):
             raise ValueError('Invalid move')
@@ -592,7 +592,7 @@ class Player(ABC):
             player_id : PlayerId,
             cards     : List[Card],
             initial   : bool
-    ) -> List[PlayId]:
+    ) -> Tuple[PlayId, ...]:
         raise NotImplementedError
 
 class HumanPlayer(Player):
@@ -604,11 +604,11 @@ class HumanPlayer(Player):
             'D': PlayId.discard,
         }
 
-    def _convert_str_to_play_ids(self, s: str) -> List[PlayId]:
-        return [
+    def _convert_str_to_play_ids(self, s: str) -> Tuple[PlayId, ...]:
+        return tuple([
             self.char_to_play_id[c]
             for c in s
-        ]
+        ])
 
     def get_move(
             self,
@@ -616,9 +616,9 @@ class HumanPlayer(Player):
             player_id : PlayerId,
             cards     : List[Card],
             initial   : bool
-    ) -> List[PlayId]:
+    ) -> Tuple[PlayId, ...]:
         hand     = game.hands[player_id]
-        play_ids = [PlayId.discard]
+        play_ids = cast(Tuple[PlayId, ...], (PlayId.discard,))
 
         while not game.is_valid_play(player_id, cards, play_ids):
             if len(hand) != 0:
@@ -668,8 +668,8 @@ class MonteCarloPlayer(Player):
             player_id : PlayerId,
             cards     : List[Card],
             initial   : bool
-    ) -> List[PlayId]:
-        return [PlayId.front]
+    ) -> Tuple[PlayId, ...]:
+        return (PlayId.front, )
 
 
 class GameLoop():
