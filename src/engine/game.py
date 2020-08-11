@@ -1,4 +1,5 @@
 import pdb
+import multiprocessing
 from typing import List, Tuple, Union, Optional, cast, DefaultDict
 from enum import Enum, IntEnum, auto
 from functools import total_ordering
@@ -703,6 +704,7 @@ class MonteCarloPlayer(Player):
         self.cheating                   = cheating
         self.possible_initial_plays     = generate_initial_plays()
         self.possible_non_initial_plays = generate_non_initial_plays()
+        # self.pool                       = multiprocessing.Pool(2)
 
     def _select_play_based_on_outcomes(
             self,
@@ -726,6 +728,35 @@ class MonteCarloPlayer(Player):
             key = lambda x: x[1]
         )
         return res[0]
+
+    # def _compute_run_result(
+    #         self,
+    #         game: Game,
+    #         cards: List[Card],
+    #         player_id: PlayerId,
+    #         plays: List[Tuple[PlayId, ...]],
+    # ) -> Tuple[
+    #     Tuple[PlayId, ...],
+    #     Tuple[int, int]
+    # ]:
+    #     current_game    = copy.deepcopy(game)
+    #     play_to_explore = random.choice(plays)
+    #     current_game.play(
+    #         player_id = player_id,
+    #         cards     = cards,
+    #         play_ids  = play_to_explore
+    #     )
+    #     if not self.cheating:
+    #         current_game.deck.reshuffle()
+    #     random_game_loop = GameLoop(
+    #         player_1 = RandomPlayer(),
+    #         player_2 = RandomPlayer(),
+    #         game     = current_game,
+    #         verbose  = False
+    #     )
+    #     outcome = random_game_loop.run()
+
+    #     return play_to_explore, outcome
 
     def get_play(
             self,
@@ -900,7 +931,7 @@ class FullGame():
         }
 
     def run(self):
-        while all(stack != 0 for stack in self.stacks.values()):
+        while all(stack <= 0 for stack in self.stacks.values()):
             round_loop = GameLoop(
                 self.players[PlayerId.player_1],
                 self.players[PlayerId.player_2],
@@ -913,6 +944,7 @@ class FullGame():
                     winner = PlayerId.player_1
                     loser = PlayerId.player_2
                 else:
+                    diff = -diff
                     winner = PlayerId.player_2
                     loser = PlayerId.player_1
 
@@ -923,7 +955,7 @@ class FullGame():
                 '########################################\n'
                 f'Round result P1: {score_p1}, P2: {score_p2}, Difference: {diff}\n'
                 f'Stack player 1: {self.stacks[PlayerId.player_1]}\n'
-                f'Stack player 2: {self.stacks[PlayerId.player_1]}\n'
+                f'Stack player 2: {self.stacks[PlayerId.player_2]}\n'
                 '########################################'
             )
 
