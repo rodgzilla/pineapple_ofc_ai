@@ -93,6 +93,9 @@ class CardDeck():
     def __len__(self) -> int:
         return len(self.cards)
 
+    def reshuffle(self):
+        random.shuffle(self.cards)
+
     def draw_card(self) -> Card:
         if len(self) == 0:
             raise ValueError('The deck is empty.')
@@ -586,7 +589,7 @@ class Game():
 
 class Player(ABC):
     @abstractmethod
-    def get_move(
+    def get_play(
             self,
             game      : Game,
             player_id : PlayerId,
@@ -610,7 +613,7 @@ class HumanPlayer(Player):
             for c in s
         ])
 
-    def get_move(
+    def get_play(
             self,
             game      : Game,
             player_id : PlayerId,
@@ -636,55 +639,135 @@ class HumanPlayer(Player):
 
         return play_ids
 
-class MonteCarloPlayer(Player):
+
+def generate_initial_plays() -> List[Tuple[PlayId, ...]]:
+    return [
+        play
+        for play in itertools.product(
+                PlayId,
+                repeat = 5
+        )
+        if play.count(PlayId.discard) == 0 and
+        play.count(PlayId.front) <= 3
+    ]
+
+def generate_non_initial_plays() -> List[Tuple[PlayId, ...]]:
+    return [
+        play
+        for play in itertools.product(
+                PlayId,
+                repeat = 3
+        )
+        if play.count(PlayId.discard) == 1
+    ]
+
+
+class RandomPlayer(Player):
     def __init__(self):
-        self.possible_initial_moves     = self._generate_initial_moves()
-        self.possible_non_initial_moves = self._generate_non_initial_moves()
+        self.possible_initial_plays     = generate_initial_plays()
+        self.possible_non_initial_plays = generate_non_initial_plays()
 
-    def _generate_initial_moves(self):
-        return [
-            move
-            for move in itertools.product(
-                    PlayId,
-                    repeat = 5
-            )
-            if move.count(PlayId.discard) == 0 and
-            move.count(PlayId.front) <= 3
-        ]
-
-    def _generate_non_initial_moves(self):
-        return [
-            move
-            for move in itertools.product(
-                    PlayId,
-                    repeat = 3
-            )
-            if move.count(PlayId.discard) == 1
-        ]
-
-    def get_move(
+    def get_play(
             self,
             game      : Game,
             player_id : PlayerId,
             cards     : List[Card],
             initial   : bool
     ) -> Tuple[PlayId, ...]:
-        return (PlayId.front, )
+        # we get the list of possible plays corresponding to the situation
+        plays = (
+            self.possible_initial_plays
+            if initial else
+            self.possible_non_initial_plays
+        )
+        # We filter out plays that are not valid
+        plays = [
+            play
+            for play in plays
+            if game.is_valid_play(
+                    player_id,
+                    cards,
+                    play
+            )
+        ]
+
+        # We return a randomly chosen play
+        return random.choice(plays)
+
+
+class MonteCarloPlayer(Player):
+    def __init__(self, n_run: int):
+        self.n_run                      = n_run
+        self.possible_initial_plays     = generate_initial_plays()
+        self.possible_non_initial_plays = generate_non_initial_plays()
+
+    def get_play(
+            self,
+            game      : Game,
+            player_id : PlayerId,
+            cards     : List[Card],
+            initial   : bool
+    ) -> Tuple[PlayId, ...]:
+        play_to_outcomes = defaultdict(list)
+        plays            = (
+            self.possible_initial_plays
+            if initial else
+            self.possible_non_initial_plays
+        )
+        # We filter out plays that are not valid
+        plays            = [
+            play
+            for play in plays
+            if game.is_valid_play(
+                    player_id,
+                    cards,
+                    play
+            )
+        ]
+
+        for _ in range(self.n_run):
+            current_game = copy.deepcopy(game)
+            play_to_explore = random.choice(plays)
+            current_game.play(
+                player_id = player_id,
+                cards     = cards,
+                play_ids  = play_to_explore
+            )
+            current_game.deck.reshuffle()
+            random_game_loop = GameLoop(
+                player_1 = RandomPlayer(),
+                player_2 = RandomPlayer(),
+                game     = current_game,
+                verbose  = False
+            )
+            outcome = random_game_loop.run()
+        return plays[0]
 
 
 class GameLoop():
-    def __init__(self, player_1: Player, player_2: Player):
-        self.game            = Game()
+    # def __init__(self, cards: Optional[List[Card]] = None):
+    def __init__(
+            self,
+            player_1: Player,
+            player_2: Player,
+            game: Optional[Game] = None,
+            verbose: bool = True,
+    ):
         self.players         = {
             PlayerId.player_1: player_1,
             PlayerId.player_2: player_2
         }
-        self.char_to_play_id = {
-            'B': PlayId.back,
-            'M': PlayId.middle,
-            'F': PlayId.front,
-            'D': PlayId.discard,
-        }
+        if game is None:
+            self.game = Game()
+        else:
+            self.game = Game()
+        self.verbose = verbose
+        # self.char_to_play_id = {
+        #     'B': PlayId.back,
+        #     'M': PlayId.middle,
+        #     'F': PlayId.front,
+        #     'D': PlayId.discard,
+        # }
         self.current_player  = PlayerId.player_1
 
     def _compute_and_print_result(self):
@@ -697,25 +780,26 @@ class GameLoop():
         h2                 = self.game.hands[PlayerId.player_2]
 
         score_h1, score_h2 = h1.score_versus(h2)
-        print()
-        for hand_id in hand_ids:
-            print(
-                f'{repr(h1.hands[hand_id]):15} '
-                f'{h1.strength[hand_id].rank.name:15} '
-                f'{h1.bonus[hand_id]} | '
-                f'{repr(h2.hands[hand_id]):15} '
-                f'{h2.strength[hand_id].rank.name:15} '
-                f'{h2.bonus[hand_id]}'
-            )
-        print('Scores:', score_h1, score_h2)
-        print('Difference:', score_h1 - score_h2)
+        if self.verbose:
+            print()
+            for hand_id in hand_ids:
+                print(
+                    f'{repr(h1.hands[hand_id]):15} '
+                    f'{h1.strength[hand_id].rank.name:15} '
+                    f'{h1.bonus[hand_id]} | '
+                    f'{repr(h2.hands[hand_id]):15} '
+                    f'{h2.strength[hand_id].rank.name:15} '
+                    f'{h2.bonus[hand_id]}'
+                )
+            print('Scores:', score_h1, score_h2)
+            print('Difference:', score_h1 - score_h2)
 
         return score_h1, score_h2
 
     def run(self):
         self.current_player = PlayerId.player_1
         initial_hand_p1     = self.game.draw_five_cards()
-        play_ids            = self.players[PlayerId.player_1].get_move(
+        play_ids            = self.players[PlayerId.player_1].get_play(
             game      = self.game,
             player_id = PlayerId.player_1,
             cards     = initial_hand_p1,
@@ -725,7 +809,7 @@ class GameLoop():
 
         self.current_player = PlayerId.player_2
         initial_hand_p2     = self.game.draw_five_cards()
-        play_ids            = self.players[PlayerId.player_1].get_move(
+        play_ids            = self.players[PlayerId.player_1].get_play(
             game      = self.game,
             player_id = PlayerId.player_2,
             cards     = initial_hand_p2,
@@ -741,16 +825,18 @@ class GameLoop():
                 self.current_player = PlayerId.player_2
             else:
                 self.current_player = PlayerId.player_1
-            print(self.current_player.name, 'turn')
+            if self.verbose:
+                print(self.current_player.name, 'turn')
             hand     = self.game.draw_three_cards()
-            play_ids = self.players[self.current_player].get_move(
+            play_ids = self.players[self.current_player].get_play(
                 game      = self.game,
                 player_id = self.current_player,
                 cards     = hand,
                 initial   = False
             )
             self.game.play(self.current_player, hand, play_ids)
-            print(self.game)
+            if self.verbose:
+                print(self.game)
 
         return self._compute_and_print_result()
 
@@ -816,52 +902,11 @@ class GameLoop():
 #             return h
 
 
-# def battle():
-#     hand_ids = [
-#         HandId.front,
-#         HandId.middle,
-#         HandId.back,
-#     ]
-#     h1 = generate_random_hand()
-#     h2 = generate_random_hand()
-#     # h1 = generate_non_fouling_hand()
-#     # h2 = generate_non_fouling_hand()
-
-#     score_h1, score_h2 = h1.score_versus(h2)
-#     print()
-#     for hand_id in hand_ids:
-#         print(
-#             f'{repr(h1.hands[hand_id]):15} '
-#             f'{h1.strength[hand_id].rank.name:15} '
-#             f'{h1.bonus[hand_id]} | '
-#             f'{repr(h2.hands[hand_id]):15} '
-#             f'{h2.strength[hand_id].rank.name:15} '
-#             f'{h2.bonus[hand_id]}'
-#         )
-#     print('Scores:', score_h1, score_h2)
-#     print('Difference:', score_h1 - score_h2)
-
-
-# battle()
-# test_hand_strength(5)
-# game = Game()
-# print(game)
-# draw = game.draw_five_cards()
-# game.play(
-#     PlayerId.player_1,
-#     draw,
-#     (
-#         PlayId.front,
-#         PlayId.front,
-#         PlayId.back,
-#         PlayId.middle,
-#         PlayId.middle,
-#     )
-# )
-# print('#####################')
-# print(game)
-
-player_1 = HumanPlayer()
-player_2 = HumanPlayer()
-loop = GameLoop(player_1, player_2)
-mc_player = MonteCarloPlayer()
+# player_1 = HumanPlayer()
+# player_2 = HumanPlayer()
+# loop = GameLoop(player_1, player_2)
+# mc_player = MonteCarloPlayer(20)
+loop = GameLoop(
+    MonteCarloPlayer(20),
+    HumanPlayer()
+)
