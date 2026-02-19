@@ -7,12 +7,12 @@
   --felt-light: #227048;
   --gold:       #d4a843;
   --gold-dark:  #b88e30;
-  --card-w:     42px;
-  --card-h:     61px;
-  --hand-w:     62px;
-  --hand-h:     90px;
+  --card-w:     60px;
+  --card-h:     87px;
+  --hand-w:     86px;
+  --hand-h:    124px;
   --slot-bg:    rgba(0,0,0,.18);
-  --radius:     8px;
+  --radius:     10px;
 }
 
 body {
@@ -30,35 +30,35 @@ header {
   width: 100%;
   background: rgba(0,0,0,.35);
   border-bottom: 2px solid var(--gold);
-  padding: .65rem 2rem;
+  padding: .8rem 2.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
+header h1 { font-size: 1.65rem; color: var(--gold); letter-spacing: .05em; }
 
 /* ── Global running score ───────────────────────────────────────────────── */
 .global-score {
-  display: flex; align-items: center; gap: .45rem;
-  font-size: .82rem; color: #ccc;
+  display: flex; align-items: center; gap: .55rem;
+  font-size: .95rem; color: #ccc;
 }
-.global-score .score-label { text-transform: uppercase; letter-spacing: .08em; color: #888; font-size: .7rem; }
-.score-value { font-size: 1.15rem; font-weight: 700; color: #fff; min-width: 1.5ch; text-align: center; }
-.score-sep   { color: #666; }
+.global-score .score-label { text-transform: uppercase; letter-spacing: .08em; color: #888; font-size: .78rem; }
+.score-value { font-size: 1.35rem; font-weight: 700; color: #fff; min-width: 1.5ch; text-align: center; }
+.score-sep   { color: #666; font-size: 1.1rem; }
 .score-reset {
-  background: transparent; border: 1px solid #555; border-radius: 4px;
-  color: #888; font-size: .75rem; padding: .15rem .4rem; cursor: pointer; margin-left: .15rem;
+  background: transparent; border: 1px solid #555; border-radius: 5px;
+  color: #888; font-size: .82rem; padding: .2rem .5rem; cursor: pointer; margin-left: .2rem;
 }
 .score-reset:hover { border-color: var(--gold); color: var(--gold); }
 
 #btn-new-game {
-  padding: .4rem 1.1rem;
+  padding: .5rem 1.4rem;
   border: 2px solid var(--gold);
   background: transparent;
   color: var(--gold);
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: .85rem;
+  font-size: 1rem;
   font-weight: 600;
   transition: background .15s, color .15s;
 }
@@ -67,13 +67,13 @@ header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
 /* ── Status bar ─────────────────────────────────────────────────────────── */
 .status-bar {
   width: 100%;
-  max-width: 960px;
-  margin: .5rem auto .15rem;
-  padding: .45rem 1rem;
+  max-width: 1200px;
+  margin: .6rem auto .2rem;
+  padding: .55rem 1.2rem;
   background: rgba(0,0,0,.3);
   border-radius: var(--radius);
   border-left: 4px solid var(--gold);
-  font-size: .88rem;
+  font-size: 1rem;
   text-align: center;
   color: #ffe;
 }
@@ -84,10 +84,10 @@ header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
   background: rgba(0,0,0,.65);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 1rem; z-index: 100; color: #fff;
+  gap: 1.2rem; z-index: 100; color: #fff;
 }
 .spinner {
-  width: 52px; height: 52px;
+  width: 60px; height: 60px;
   border: 5px solid rgba(255,255,255,.2);
   border-top-color: var(--gold);
   border-radius: 50%;
@@ -97,43 +97,43 @@ header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
 
 /* ── Main table ─────────────────────────────────────────────────────────── */
 .table {
-  width: 100%; max-width: 960px;
+  width: 100%; max-width: 1200px;
   display: flex; flex-direction: column;
-  gap: .6rem; padding: .6rem 1rem 2rem;
+  gap: .9rem; padding: .8rem 1.4rem 2.5rem;
 }
 
 /* ── Board sections ─────────────────────────────────────────────────────── */
 .board-section {
   background: var(--felt);
   border-radius: var(--radius);
-  padding: .65rem 1rem;
+  padding: .9rem 1.4rem;
   border: 1px solid rgba(255,255,255,.07);
-  box-shadow: 0 2px 10px rgba(0,0,0,.4);
+  box-shadow: 0 3px 14px rgba(0,0,0,.4);
 }
 .board-section h2 {
-  font-size: .78rem; text-transform: uppercase; letter-spacing: .1em;
-  color: var(--gold); margin-bottom: .5rem;
+  font-size: .9rem; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--gold); margin-bottom: .65rem;
 }
-.row-label-group { display: flex; flex-direction: column; gap: .4rem; }
-.row-block       { display: flex; align-items: center; gap: .6rem; }
+.row-label-group { display: flex; flex-direction: column; gap: .55rem; }
+.row-block       { display: flex; align-items: center; gap: .8rem; }
 .row-label {
-  width: 82px; flex-shrink: 0;
-  font-size: .7rem; color: rgba(255,255,255,.5);
+  width: 96px; flex-shrink: 0;
+  font-size: .8rem; color: rgba(255,255,255,.5);
   text-transform: uppercase; letter-spacing: .06em;
 }
 .card-row {
-  display: flex; gap: .3rem; flex-wrap: wrap;
-  min-height: calc(var(--card-h) + 4px);
+  display: flex; gap: .45rem; flex-wrap: wrap;
+  min-height: calc(var(--card-h) + 6px);
   align-items: center;
-  padding: 2px;
-  border-radius: 5px;
+  padding: 3px;
+  border-radius: 6px;
   transition: background .15s, box-shadow .15s;
 }
 
 /* ── Board row as drop target ───────────────────────────────────────────── */
 .card-row.drop-row {
   border: 2px dashed rgba(255,255,255,.18);
-  padding: 2px 4px;
+  padding: 3px 6px;
 }
 .card-row.drop-row.drag-over {
   border-color: var(--gold);
@@ -145,8 +145,8 @@ header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
 .card-wrap {
   width: var(--card-w);
   flex-shrink: 0;
-  border-radius: 5px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.45);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.45);
   overflow: hidden;
   line-height: 0;
   user-select: none;
@@ -160,7 +160,7 @@ header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
 /* Hand pool cards: larger size */
 .card-wrap.hand-card {
   width: var(--hand-w);
-  box-shadow: 0 3px 10px rgba(0,0,0,.5);
+  box-shadow: 0 4px 14px rgba(0,0,0,.5);
   transition: transform .1s, box-shadow .1s;
 }
 
@@ -171,7 +171,7 @@ header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
 
 /* Cards placed this round on the board: gold outline */
 .card-wrap.newly-placed {
-  box-shadow: 0 0 0 2px var(--gold), 0 3px 8px rgba(0,0,0,.5);
+  box-shadow: 0 0 0 2px var(--gold), 0 4px 10px rgba(0,0,0,.5);
 }
 
 /* The last unplaced card in a 3-card round (will be auto-discarded) */
@@ -186,11 +186,11 @@ header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
   bottom: 0; left: 0; right: 0;
   background: rgba(180,40,40,.85);
   color: #fff;
-  font-size: .55rem;
+  font-size: .6rem;
   font-weight: 700;
   letter-spacing: .06em;
   text-align: center;
-  padding: 2px 0;
+  padding: 3px 0;
 }
 
 /* ── Empty slot ─────────────────────────────────────────────────────────── */
@@ -198,97 +198,97 @@ header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
   width: var(--card-w);
   height: var(--card-h);
   border: 2px dashed rgba(255,255,255,.2);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--slot-bg);
   flex-shrink: 0;
 }
 
 /* ── Action area (hand + confirm — inside player section) ────────────────── */
 .action-area {
-  margin-top: .6rem;
+  margin-top: .8rem;
 }
 
 .hand-sep {
   height: 1px;
   background: rgba(255,255,255,.12);
-  margin: .5rem 0;
+  margin: .65rem 0;
 }
 
 .hand-label {
-  font-size: .7rem;
+  font-size: .8rem;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: rgba(255,255,255,.5);
-  margin-bottom: .45rem;
+  margin-bottom: .55rem;
 }
 
 .hand-pool {
   display: flex;
   flex-wrap: wrap;
-  gap: .45rem;
-  min-height: calc(var(--hand-h) + 4px);
+  gap: .6rem;
+  min-height: calc(var(--hand-h) + 6px);
   align-items: center;
-  padding: .3rem 0;
+  padding: .35rem 0;
 }
 
 /* ── Confirm controls ───────────────────────────────────────────────────── */
 .action-controls {
-  display: flex; flex-direction: column; align-items: center; gap: .35rem;
-  margin-top: .5rem;
+  display: flex; flex-direction: column; align-items: center; gap: .45rem;
+  margin-top: .65rem;
 }
 .btn-confirm {
-  padding: .5rem 1.8rem;
+  padding: .65rem 2.2rem;
   background: var(--gold);
   border: none; border-radius: var(--radius);
-  color: #000; font-size: .9rem; font-weight: 700;
+  color: #000; font-size: 1rem; font-weight: 700;
   cursor: pointer; transition: background .15s, opacity .15s;
 }
 .btn-confirm:hover:not(:disabled) { background: var(--gold-dark); }
 .btn-confirm:disabled { opacity: .38; cursor: not-allowed; }
-.hint { font-size: .78rem; color: rgba(255,255,255,.5); text-align: center; min-height: 1.1em; }
+.hint { font-size: .88rem; color: rgba(255,255,255,.5); text-align: center; min-height: 1.2em; }
 
 /* ── Game-over overlay ──────────────────────────────────────────────────── */
 .game-over {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.72);
   display: flex; align-items: center; justify-content: center;
-  z-index: 90; padding: 1rem;
+  z-index: 90; padding: 1.2rem;
 }
 .game-over-card {
-  background: #1e3a2e; border: 2px solid var(--gold); border-radius: 12px;
-  padding: 1.6rem 1.8rem; max-width: 680px; width: 100%;
+  background: #1e3a2e; border: 2px solid var(--gold); border-radius: 14px;
+  padding: 2rem 2.2rem; max-width: 720px; width: 100%;
   box-shadow: 0 8px 40px rgba(0,0,0,.7); text-align: center;
 }
-.game-over-card h2 { font-size: 1.5rem; color: var(--gold); margin-bottom: .9rem; }
-.go-scores { display: flex; justify-content: center; gap: 3rem; margin-bottom: 1.1rem; }
+.game-over-card h2 { font-size: 1.75rem; color: var(--gold); margin-bottom: 1rem; }
+.go-scores { display: flex; justify-content: center; gap: 3.5rem; margin-bottom: 1.3rem; }
 .go-score-block { text-align: center; }
-.go-score-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: #aaa; }
-.go-score-value { font-size: 2.6rem; font-weight: 800; color: #fff; line-height: 1.1; }
+.go-score-label { font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; color: #aaa; }
+.go-score-value { font-size: 3rem; font-weight: 800; color: #fff; line-height: 1.1; }
 .go-score-value.winner { color: var(--gold); }
 .go-score-value.loser  { color: #777; }
-.foul-badge { font-size: .72rem; color: #e74c3c; font-weight: 700; margin-top: .1rem; }
-.go-table { width: 100%; border-collapse: collapse; font-size: .83rem; text-align: left; }
-.go-table th { padding: .35rem .45rem; color: var(--gold); border-bottom: 1px solid var(--gold-dark); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
-.go-table td { padding: .4rem .45rem; border-bottom: 1px solid rgba(255,255,255,.06); color: #ccc; }
+.foul-badge { font-size: .8rem; color: #e74c3c; font-weight: 700; margin-top: .15rem; }
+.go-table { width: 100%; border-collapse: collapse; font-size: .95rem; text-align: left; }
+.go-table th { padding: .45rem .55rem; color: var(--gold); border-bottom: 1px solid var(--gold-dark); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+.go-table td { padding: .5rem .55rem; border-bottom: 1px solid rgba(255,255,255,.06); color: #ccc; }
 .go-table tr:last-child td { border-bottom: none; }
 .go-winner { color: var(--gold); font-weight: 700; }
 .go-loser  { color: #666; }
 .go-tie    { color: #999; }
-td.winner-cell { text-align: center; font-size: .78rem; color: var(--gold); font-weight: 700; }
+td.winner-cell { text-align: center; font-size: .88rem; color: var(--gold); font-weight: 700; }
 
 /* ── Welcome screen ─────────────────────────────────────────────────────── */
 .welcome {
   position: fixed; inset: 0; background: rgba(0,0,0,.6);
   display: flex; align-items: center; justify-content: center;
-  z-index: 80; padding: 1rem;
+  z-index: 80; padding: 1.2rem;
 }
 .welcome-card {
-  background: #1e3a2e; border: 2px solid var(--gold); border-radius: 12px;
-  padding: 1.8rem 2.2rem; max-width: 480px; text-align: center;
+  background: #1e3a2e; border: 2px solid var(--gold); border-radius: 14px;
+  padding: 2.2rem 2.8rem; max-width: 520px; text-align: center;
   box-shadow: 0 8px 40px rgba(0,0,0,.7);
 }
-.welcome-card h2  { color: var(--gold); font-size: 1.35rem; margin-bottom: .8rem; }
-.welcome-card p   { font-size: .9rem; line-height: 1.65; color: #ccc; margin-bottom: 1.3rem; }
+.welcome-card h2  { color: var(--gold); font-size: 1.55rem; margin-bottom: .9rem; }
+.welcome-card p   { font-size: 1rem; line-height: 1.7; color: #ccc; margin-bottom: 1.5rem; }
 
 /* ── Utility ─────────────────────────────────────────────────────────────── */
 .hidden { display: none !important; }
