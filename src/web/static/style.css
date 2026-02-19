@@ -98,12 +98,13 @@ header h1 { font-size: 1.65rem; color: var(--gold); letter-spacing: .05em; }
 /* ── Main table ─────────────────────────────────────────────────────────── */
 .table {
   width: 100%; max-width: 1200px;
-  display: flex; flex-direction: column;
-  gap: .9rem; padding: .8rem 1.4rem 2.5rem;
+  display: flex; flex-direction: row; align-items: flex-start;
+  gap: 1.2rem; padding: .8rem 1.4rem 2.5rem;
 }
 
 /* ── Board sections ─────────────────────────────────────────────────────── */
 .board-section {
+  flex: 1; min-width: 0;
   background: var(--felt);
   border-radius: var(--radius);
   padding: .9rem 1.4rem;

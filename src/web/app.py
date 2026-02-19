@@ -16,6 +16,9 @@ app.secret_key = 'pineapple-ofc-secret'
 # In-memory game store: game_id -> game_state dict
 games = {}
 
+# Tracks how many games have been started (used to alternate first player)
+game_count = 0
+
 # Monte Carlo simulations per AI turn (lower = faster response, weaker AI)
 N_SIMULATIONS = 20000
 
@@ -60,6 +63,7 @@ def build_response(game_id, game_state):
         'player_board': hand_to_dict(game.hands[PlayerId.player_1]),
         'ai_board':     hand_to_dict(game.hands[PlayerId.player_2]),
         'cards':        [card_to_dict(c) for c in game_state.get('current_cards', [])],
+        'ai_goes_first': game_state.get('ai_goes_first', False),
     }
 
     if phase == 'game_over':
@@ -81,8 +85,13 @@ def run_ai_turns(game_state):
     p1   = game.hands[PlayerId.player_1]
     p2   = game.hands[PlayerId.player_2]
 
-    # Run one AI turn whenever the human is ahead in card count.
-    if not p2.is_hand_complete() and len(p2) < len(p1):
+    # Run one AI turn whenever the human is ahead (or equal when AI goes first).
+    ai_goes_first = game_state.get('ai_goes_first', False)
+    should_play_ai = (
+        not p2.is_hand_complete() and
+        (len(p2) <= len(p1) if ai_goes_first else len(p2) < len(p1))
+    )
+    if should_play_ai:
         is_initial = (len(p2) == 0)
         cards      = list(
             game.draw_five_cards() if is_initial else game.draw_three_cards()
@@ -145,6 +154,10 @@ def index():
 
 @app.route('/api/new_game', methods=['POST'])
 def new_game():
+    global game_count
+    ai_goes_first = (game_count % 2 == 1)
+    game_count   += 1
+
     game_id  = str(uuid.uuid4())
     game     = Game()
     ai_player = MonteCarloPlayer(
@@ -158,7 +171,19 @@ def new_game():
         'ai_player':     ai_player,
         'phase':         'init_human',
         'current_cards': [],
+        'ai_goes_first': ai_goes_first,
     }
+
+    if ai_goes_first:
+        # AI plays its opening five first, then deal to the human
+        ai_cards = list(game.draw_five_cards())
+        play_ids = ai_player.get_play(
+            game=game,
+            player_id=PlayerId.player_2,
+            cards=ai_cards,
+            initial=True,
+        )
+        game.play(PlayerId.player_2, ai_cards, play_ids)
 
     # Deal the human's opening five cards
     cards = list(game.draw_five_cards())

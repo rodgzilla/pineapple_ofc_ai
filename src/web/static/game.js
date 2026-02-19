@@ -129,7 +129,11 @@ function applyState(state) {
         ? 'Your Cards — drag up to place (Front ≤ 3 cards)'
         : 'Your Cards — drag 2 to the board; the last card is discarded automatically'
     );
-    setStatus(null);
+    if (isInitial) {
+      setStatus(state.ai_goes_first ? 'AI goes first this game.' : 'You go first this game.');
+    } else {
+      setStatus(null);
+    }
     enableBoardDrop();
   } else if (state.phase === 'game_over') {
     isActionMode = false;
