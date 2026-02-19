@@ -1046,13 +1046,14 @@ class FullGame():
 #     HumanPlayer(),
 # )
 
-full_game = FullGame(
-    player_1 = MonteCarloPlayer(
-        player_id = PlayerId.player_1,
-        n_run     = 20000,
-        cheating  = False
-    ),
-    player_2 = HumanPlayer(),
-    starting_stack = 50
-)
-full_game.run()
+if __name__ == '__main__':
+    full_game = FullGame(
+        player_1 = MonteCarloPlayer(
+            player_id = PlayerId.player_1,
+            n_run     = 20000,
+            cheating  = False
+        ),
+        player_2 = HumanPlayer(),
+        starting_stack = 50
+    )
+    full_game.run()
