@@ -11,6 +11,14 @@
 <!-- ── Header ────────────────────────────────────────────────────────────── -->
 <header>
   <h1>🍍 Pineapple OFC Poker</h1>
+  <div class="global-score">
+    <span class="score-label">You</span>
+    <span id="score-player" class="score-value">0</span>
+    <span class="score-sep">—</span>
+    <span id="score-ai" class="score-value">0</span>
+    <span class="score-label">AI</span>
+    <button class="score-reset" onclick="resetGlobalScore()" title="Reset score">↺</button>
+  </div>
   <button id="btn-new-game" onclick="newGame()">New Game</button>
 </header>
 

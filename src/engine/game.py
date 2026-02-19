@@ -812,9 +812,13 @@ class MonteCarloPlayer(Player):
         # for play, outcome in result:
         #     play_to_outcomes[play].append(outcome)
 
-        for _ in range(self.n_run):
+        # Shuffle once then cycle (round-robin) so every valid play gets
+        # an equal share of evaluations instead of purely random sampling.
+        plays_cycle = plays.copy()
+        random.shuffle(plays_cycle)
+        for i in range(self.n_run):
             current_game = copy.deepcopy(game)
-            play_to_explore = random.choice(plays)
+            play_to_explore = plays_cycle[i % len(plays_cycle)]
             current_game.play(
                 player_id = player_id,
                 cards     = cards,

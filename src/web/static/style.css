@@ -7,10 +7,10 @@
   --felt-light: #227048;
   --gold:       #d4a843;
   --gold-dark:  #b88e30;
-  --card-w:     54px;
-  --card-h:     78px;
-  --hand-w:     76px;
-  --hand-h:    110px;
+  --card-w:     42px;
+  --card-h:     61px;
+  --hand-w:     62px;
+  --hand-h:     90px;
   --slot-bg:    rgba(0,0,0,.18);
   --radius:     8px;
 }
@@ -36,6 +36,21 @@ header {
   justify-content: space-between;
 }
 header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
+
+/* ── Global running score ───────────────────────────────────────────────── */
+.global-score {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .82rem; color: #ccc;
+}
+.global-score .score-label { text-transform: uppercase; letter-spacing: .08em; color: #888; font-size: .7rem; }
+.score-value { font-size: 1.15rem; font-weight: 700; color: #fff; min-width: 1.5ch; text-align: center; }
+.score-sep   { color: #666; }
+.score-reset {
+  background: transparent; border: 1px solid #555; border-radius: 4px;
+  color: #888; font-size: .75rem; padding: .15rem .4rem; cursor: pointer; margin-left: .15rem;
+}
+.score-reset:hover { border-color: var(--gold); color: var(--gold); }
+
 #btn-new-game {
   padding: .4rem 1.1rem;
   border: 2px solid var(--gold);
@@ -142,18 +157,17 @@ header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: .05em; }
   display: block;
 }
 
-/* Draggable hand cards (larger) */
+/* Hand pool cards: larger size */
 .card-wrap.hand-card {
   width: var(--hand-w);
-  cursor: grab;
   box-shadow: 0 3px 10px rgba(0,0,0,.5);
   transition: transform .1s, box-shadow .1s;
 }
-.card-wrap.hand-card:active { cursor: grabbing; }
-.card-wrap.hand-card.dragging {
-  opacity: .45;
-  transform: scale(1.04);
-}
+
+/* Any draggable card: grab cursor */
+.card-wrap.draggable         { cursor: grab; }
+.card-wrap.draggable:active  { cursor: grabbing; }
+.card-wrap.draggable.dragging { opacity: .45; }
 
 /* Cards placed this round on the board: gold outline */
 .card-wrap.newly-placed {

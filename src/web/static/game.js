@@ -11,6 +11,35 @@ let boardPlacements   = { front: [], middle: [], back: [] }; // current-round pl
 let isInitial         = false;
 let isActionMode      = false;
 
+/* ── Global running score (persisted in localStorage) ────────────────────── */
+let globalScore = { player: 0, ai: 0 };
+
+function loadGlobalScore() {
+  try {
+    const saved = localStorage.getItem('ofc_score');
+    if (saved) globalScore = JSON.parse(saved);
+  } catch (_) {}
+  renderGlobalScore();
+}
+
+function addToGlobalScore(playerDelta, aiDelta) {
+  globalScore.player += playerDelta;
+  globalScore.ai     += aiDelta;
+  try { localStorage.setItem('ofc_score', JSON.stringify(globalScore)); } catch (_) {}
+  renderGlobalScore();
+}
+
+function resetGlobalScore() {
+  globalScore = { player: 0, ai: 0 };
+  try { localStorage.removeItem('ofc_score'); } catch (_) {}
+  renderGlobalScore();
+}
+
+function renderGlobalScore() {
+  $('score-player').textContent = globalScore.player;
+  $('score-ai').textContent     = globalScore.ai;
+}
+
 /* ── SVG sprite map ─────────────────────────────────────────────────────── */
 const CARD_SPRITE = '/static/svg-cards.svg';
 const SUIT_NAME   = { d: 'diamond', c: 'club', s: 'spade', h: 'heart' };
@@ -163,6 +192,7 @@ function renderHandArea() {
   currentCards.forEach((card, idx) => {
     if (!placed.has(idx)) {
       const el = makeCard(card, true, idx);
+      el.classList.add('hand-card'); // larger size in the hand pool
       // Mark as auto-discard when exactly one card remains in a 3-card round
       if (!isInitial && unplacedCount === 1) el.classList.add('will-discard');
       pool.appendChild(el);
@@ -177,13 +207,15 @@ function refreshUI() {
 }
 
 /* ── Card DOM builder (SVG sprite) ──────────────────────────────────────── */
+// Always creates at board size. Caller adds 'hand-card' class for the
+// larger hand-pool size. 'draggable' class is added when isDraggable=true.
 function makeCard(c, isDraggable = false, idx = null) {
   const suitName   = SUIT_NAME[c.suit];
   const heightName = HEIGHT_NAME[c.height];
   const spriteId   = `${suitName}_${heightName}`;
 
   const wrap = document.createElement('div');
-  wrap.className = 'card-wrap' + (isDraggable ? ' hand-card' : '');
+  wrap.className = 'card-wrap';
 
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 169.075 244.640');
@@ -195,6 +227,7 @@ function makeCard(c, isDraggable = false, idx = null) {
   wrap.appendChild(svg);
 
   if (isDraggable && idx !== null) {
+    wrap.classList.add('draggable');
     wrap.setAttribute('draggable', 'true');
     wrap.dataset.idx = idx;
     wrap.addEventListener('dragstart', e => {
@@ -302,6 +335,7 @@ function updateConfirmButton() {
 /* ── Game-over screen ───────────────────────────────────────────────────── */
 function showGameOver(state) {
   const { scores, is_foul: isFoul, hand_results: results } = state;
+  addToGlobalScore(scores.player, scores.ai);
   const playerWon = scores.player > scores.ai;
   const aiWon     = scores.ai > scores.player;
 
@@ -354,3 +388,6 @@ function setStatus(msg) {
   else     { bar.classList.add('hidden'); }
 }
 function setHint(msg) { $('placement-hint').textContent = msg || ''; }
+
+/* ── Init ────────────────────────────────────────────────────────────────── */
+loadGlobalScore();

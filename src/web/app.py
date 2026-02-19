@@ -17,7 +17,7 @@ app.secret_key = 'pineapple-ofc-secret'
 games = {}
 
 # Monte Carlo simulations per AI turn (lower = faster response, weaker AI)
-N_SIMULATIONS = 500
+N_SIMULATIONS = 2000
 
 HAND_RANK_NAMES = {
     HandRank.HIGH_CARD:       'High Card',
