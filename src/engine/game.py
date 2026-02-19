@@ -1,10 +1,8 @@
-import pdb
-import multiprocessing
+import pickle
 from typing import List, Tuple, Union, Optional, cast, DefaultDict
 from enum import Enum, IntEnum, auto
 from functools import total_ordering
 from collections import Counter, defaultdict
-import copy
 import random
 from abc import ABC, abstractmethod
 import itertools
@@ -812,12 +810,16 @@ class MonteCarloPlayer(Player):
         # for play, outcome in result:
         #     play_to_outcomes[play].append(outcome)
 
+        # Serialise the game state once; pickle.loads is 3-5x faster than
+        # copy.deepcopy for nested Python objects of this size.
+        game_bytes = pickle.dumps(game, protocol=pickle.HIGHEST_PROTOCOL)
+
         # Shuffle once then cycle (round-robin) so every valid play gets
         # an equal share of evaluations instead of purely random sampling.
         plays_cycle = plays.copy()
         random.shuffle(plays_cycle)
         for i in range(self.n_run):
-            current_game = copy.deepcopy(game)
+            current_game = pickle.loads(game_bytes)
             play_to_explore = plays_cycle[i % len(plays_cycle)]
             current_game.play(
                 player_id = player_id,
