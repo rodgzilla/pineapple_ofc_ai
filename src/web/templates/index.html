@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pineapple OFC Poker</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ── Header ────────────────────────────────────────────────────────────── -->
+<header>
+  <h1>🍍 Pineapple OFC Poker</h1>
+  <button id="btn-new-game" onclick="newGame()">New Game</button>
+</header>
+
+<!-- ── Status bar ───────────────────────────────────────────────────────── -->
+<div id="status-bar" class="status-bar hidden"></div>
+
+<!-- ── Loading overlay ──────────────────────────────────────────────────── -->
+<div id="loading" class="loading hidden">
+  <div class="spinner"></div>
+  <p>AI is thinking…</p>
+</div>
+
+<!-- ── Main table ───────────────────────────────────────────────────────── -->
+<main id="table" class="table hidden">
+
+  <!-- AI board -->
+  <section class="board-section ai-section">
+    <h2>AI's Board</h2>
+    <div class="board" id="ai-board">
+      <div class="row-label-group">
+        <div class="row-block">
+          <span class="row-label">Front (3)</span>
+          <div class="card-row" id="ai-front"></div>
+        </div>
+        <div class="row-block">
+          <span class="row-label">Middle (5)</span>
+          <div class="card-row" id="ai-middle"></div>
+        </div>
+        <div class="row-block">
+          <span class="row-label">Back (5)</span>
+          <div class="card-row" id="ai-back"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Divider / current hand area -->
+  <section id="action-area" class="action-area hidden">
+    <h2 id="action-title">Your Cards</h2>
+
+    <div id="hand-area" class="hand-area"></div>
+
+    <div class="action-controls">
+      <button id="btn-confirm" class="btn-confirm" onclick="submitPlay()" disabled>
+        Confirm Placement
+      </button>
+      <p id="placement-hint" class="hint"></p>
+    </div>
+  </section>
+
+  <!-- Player board -->
+  <section class="board-section player-section">
+    <h2>Your Board</h2>
+    <div class="board" id="player-board">
+      <div class="row-label-group">
+        <div class="row-block">
+          <span class="row-label">Front (3)</span>
+          <div class="card-row" id="player-front"></div>
+        </div>
+        <div class="row-block">
+          <span class="row-label">Middle (5)</span>
+          <div class="card-row" id="player-middle"></div>
+        </div>
+        <div class="row-block">
+          <span class="row-label">Back (5)</span>
+          <div class="card-row" id="player-back"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Game-over overlay ─────────────────────────────────────────────────── -->
+<div id="game-over" class="game-over hidden">
+  <div class="game-over-card">
+    <h2 id="go-title">Game Over</h2>
+    <div id="go-scores" class="go-scores"></div>
+    <table id="go-table" class="go-table">
+      <thead>
+        <tr>
+          <th>Row</th>
+          <th>Your Hand</th>
+          <th>Bonus</th>
+          <th></th>
+          <th>AI Hand</th>
+          <th>Bonus</th>
+        </tr>
+      </thead>
+      <tbody id="go-tbody"></tbody>
+    </table>
+    <button class="btn-confirm" style="margin-top:1.5rem" onclick="newGame()">
+      Play Again
+    </button>
+  </div>
+</div>
+
+<!-- ── Welcome screen ───────────────────────────────────────────────────── -->
+<div id="welcome" class="welcome">
+  <div class="welcome-card">
+    <h2>Welcome to Pineapple OFC</h2>
+    <p>
+      You play <strong>Player 1</strong> against a <strong>Monte Carlo AI</strong>.<br>
+      Build three poker hands: Front (3 cards), Middle (5), and Back (5).<br>
+      Back must be strongest, Front the weakest — or you foul!
+    </p>
+    <button class="btn-confirm" onclick="newGame()">Start Game</button>
+  </div>
+</div>
+
+<script src="/static/game.js"></script>
+</body>
+</html>
