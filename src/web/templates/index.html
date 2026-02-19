@@ -29,7 +29,7 @@
   <!-- AI board -->
   <section class="board-section ai-section">
     <h2>AI's Board</h2>
-    <div class="board" id="ai-board">
+    <div class="board">
       <div class="row-label-group">
         <div class="row-block">
           <span class="row-label">Front (3)</span>
@@ -47,37 +47,36 @@
     </div>
   </section>
 
-  <!-- Divider / current hand area -->
-  <section id="action-area" class="action-area hidden">
-    <h2 id="action-title">Your Cards</h2>
-
-    <div id="hand-area" class="hand-area"></div>
-
-    <div class="action-controls">
-      <button id="btn-confirm" class="btn-confirm" onclick="submitPlay()" disabled>
-        Confirm Placement
-      </button>
-      <p id="placement-hint" class="hint"></p>
-    </div>
-  </section>
-
-  <!-- Player board -->
+  <!-- Player board + hand area (combined) -->
   <section class="board-section player-section">
     <h2>Your Board</h2>
-    <div class="board" id="player-board">
+    <div class="board">
       <div class="row-label-group">
         <div class="row-block">
           <span class="row-label">Front (3)</span>
-          <div class="card-row" id="player-front"></div>
+          <div class="card-row" id="player-front" data-row="front"></div>
         </div>
         <div class="row-block">
           <span class="row-label">Middle (5)</span>
-          <div class="card-row" id="player-middle"></div>
+          <div class="card-row" id="player-middle" data-row="middle"></div>
         </div>
         <div class="row-block">
           <span class="row-label">Back (5)</span>
-          <div class="card-row" id="player-back"></div>
+          <div class="card-row" id="player-back" data-row="back"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Hand area: only visible during human turn -->
+    <div id="action-area" class="action-area hidden">
+      <div class="hand-sep"></div>
+      <p id="action-title" class="hand-label"></p>
+      <div id="hand-pool" class="hand-pool"></div>
+      <div class="action-controls">
+        <button id="btn-confirm" class="btn-confirm" onclick="submitPlay()" disabled>
+          Confirm Placement
+        </button>
+        <p id="placement-hint" class="hint"></p>
       </div>
     </div>
   </section>

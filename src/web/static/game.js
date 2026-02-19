@@ -4,33 +4,26 @@
 'use strict';
 
 /* ── State ─────────────────────────────────────────────────────────────── */
-let gameId       = null;
-let currentCards = [];      // [{height, suit}, …] – the cards in the current hand
-let assignments  = {};      // card_idx → zone name ('front'|'middle'|'back'|'discard')
-let isInitial    = false;
+let gameId            = null;
+let currentCards      = [];   // [{height, suit}] – cards in the current hand
+let currentServerBoard = null; // board from server (already-placed cards)
+let boardPlacements   = { front: [], middle: [], back: [] }; // current-round placements (indices)
+let isInitial         = false;
+let isActionMode      = false;
 
-/* ── Card appearance helpers ───────────────────────────────────────────── */
-const SUIT_SYMBOL = { d: '♦', c: '♣', s: '♠', h: '♥' };
-const SUIT_COLOR  = { d: 'red', c: 'black', s: 'black', h: 'red' };
-
-// Pip positions: [top%, left%, invert(0=up,1=down)] within the pip area
-const PIP_LAYOUTS = {
-  '2': [[18,50,0],[82,50,1]],
-  '3': [[18,50,0],[50,50,0],[82,50,1]],
-  '4': [[18,30,0],[18,70,0],[82,30,1],[82,70,1]],
-  '5': [[18,30,0],[18,70,0],[50,50,0],[82,30,1],[82,70,1]],
-  '6': [[20,30,0],[20,70,0],[50,30,0],[50,70,0],[80,30,1],[80,70,1]],
-  '7': [[18,30,0],[18,70,0],[34,50,0],[52,30,0],[52,70,0],[82,30,1],[82,70,1]],
-  '8': [[18,30,0],[18,70,0],[34,50,0],[52,30,0],[52,70,0],[66,50,1],[82,30,1],[82,70,1]],
-  '9': [[18,30,0],[18,70,0],[35,30,0],[35,70,0],[50,50,0],[65,30,1],[65,70,1],[82,30,1],[82,70,1]],
-  'T': [[18,30,0],[18,70,0],[30,50,0],[42,30,0],[42,70,0],[58,30,1],[58,70,1],[70,50,1],[82,30,1],[82,70,1]],
+/* ── SVG sprite map ─────────────────────────────────────────────────────── */
+const CARD_SPRITE = '/static/svg-cards.svg';
+const SUIT_NAME   = { d: 'diamond', c: 'club', s: 'spade', h: 'heart' };
+const HEIGHT_NAME = {
+  A: '1', '2': '2', '3': '3', '4': '4', '5': '5',
+  '6': '6', '7': '7', '8': '8', '9': '9', T: '10',
+  J: 'jack', Q: 'queen', K: 'king',
 };
-const FACE_LABELS = { J: 'J', Q: 'Q', K: 'K' };
 
 /* ── DOM helper ─────────────────────────────────────────────────────────── */
 const $ = id => document.getElementById(id);
 
-/* ── API – entry points ─────────────────────────────────────────────────── */
+/* ── API entry points ───────────────────────────────────────────────────── */
 async function newGame() {
   hideGameOver();
   showLoading();
@@ -46,14 +39,24 @@ async function newGame() {
 }
 
 async function submitPlay() {
-  if (!validateAssignments()) return;
+  const placements = [];
+  ['front', 'middle', 'back'].forEach(row => {
+    boardPlacements[row].forEach(idx => placements.push({ card_idx: idx, row }));
+  });
 
-  const placements = Object.entries(assignments).map(([idx, row]) => ({
-    card_idx: parseInt(idx), row,
-  }));
+  // Auto-discard: for 3-card rounds, the single unplaced card is discarded
+  if (!isInitial) {
+    const placed = getAllPlacedIndices();
+    for (let i = 0; i < currentCards.length; i++) {
+      if (!placed.has(i)) { placements.push({ card_idx: i, row: 'discard' }); break; }
+    }
+  }
 
   showLoading();
   $('btn-confirm').disabled = true;
+  isActionMode = false;
+  disableBoardDrop();
+
   try {
     const resp  = await fetch('/api/play', {
       method: 'POST',
@@ -64,12 +67,16 @@ async function submitPlay() {
     if (state.error) {
       setStatus('Error: ' + state.error);
       $('btn-confirm').disabled = false;
+      isActionMode = true;
+      enableBoardDrop();
       return;
     }
     applyState(state);
   } catch (e) {
     setStatus('Network error: ' + e.message);
     $('btn-confirm').disabled = false;
+    isActionMode = true;
+    enableBoardDrop();
   } finally {
     hideLoading();
   }
@@ -77,32 +84,40 @@ async function submitPlay() {
 
 /* ── State renderer ─────────────────────────────────────────────────────── */
 function applyState(state) {
-  gameId = state.game_id;
-  renderBoard('player', state.player_board);
-  renderBoard('ai',     state.ai_board);
+  gameId             = state.game_id;
+  currentServerBoard = state.player_board;
+  renderAIBoard(state.ai_board);
   $('table').classList.remove('hidden');
 
   if (state.phase === 'init_human' || state.phase === 'human_turn') {
-    isInitial    = (state.phase === 'init_human');
-    currentCards = state.cards;
-    assignments  = {};
-    buildDragDropUI(currentCards);
-    showActionArea(isInitial ? 'Place Your Opening 5 Cards' : 'Place Your Cards');
-    setStatus(isInitial
-      ? 'Drag your cards into Front, Middle, or Back. Front gets at most 3 cards.'
-      : 'Drag 2 cards into a row and 1 card into Discard.');
+    isInitial       = (state.phase === 'init_human');
+    isActionMode    = true;
+    currentCards    = state.cards;
+    boardPlacements = { front: [], middle: [], back: [] };
+    refreshUI();
+    showActionArea(
+      isInitial
+        ? 'Your Cards — drag up to place (Front ≤ 3 cards)'
+        : 'Your Cards — drag 2 to the board; the last card is discarded automatically'
+    );
+    setStatus(null);
+    enableBoardDrop();
   } else if (state.phase === 'game_over') {
+    isActionMode = false;
+    currentServerBoard = state.player_board;
+    disableBoardDrop();
     hideActionArea();
+    refreshUI();
     showGameOver(state);
     setStatus('Game over!');
   }
 }
 
-/* ── Board rendering (already-placed cards) ─────────────────────────────── */
-function renderBoard(who, board) {
+/* ── Board rendering ────────────────────────────────────────────────────── */
+function renderAIBoard(board) {
   ['front', 'middle', 'back'].forEach(row => {
-    const max  = row === 'front' ? 3 : 5;
-    const el   = $(`${who}-${row}`);
+    const max = row === 'front' ? 3 : 5;
+    const el  = $(`ai-${row}`);
     el.innerHTML = '';
     (board[row] || []).forEach(c => el.appendChild(makeCard(c)));
     for (let i = (board[row] || []).length; i < max; i++) {
@@ -113,194 +128,175 @@ function renderBoard(who, board) {
   });
 }
 
-/* ── Drag-and-drop UI ───────────────────────────────────────────────────── */
-function buildDragDropUI(cards) {
-  const area = $('hand-area');
-  area.innerHTML = '';
+function renderPlayerBoard() {
+  ['front', 'middle', 'back'].forEach(row => {
+    const max = row === 'front' ? 3 : 5;
+    const el  = $(`player-${row}`);
+    el.innerHTML = '';
 
-  /* ---- Row drop zones ---- */
-  const zonesRow = document.createElement('div');
-  zonesRow.className = 'zones-row';
+    // Permanent cards placed in previous rounds
+    (currentServerBoard[row] || []).forEach(c => el.appendChild(makeCard(c)));
 
-  const rowNames = isInitial ? ['front', 'middle', 'back'] : ['front', 'middle', 'back', 'discard'];
-  rowNames.forEach(name => {
-    zonesRow.appendChild(makeZone(name));
+    // Cards placed this round (draggable, gold-highlighted)
+    boardPlacements[row].forEach(idx => {
+      const card = makeCard(currentCards[idx], true, idx);
+      card.classList.add('newly-placed');
+      el.appendChild(card);
+    });
+
+    // Empty slots
+    const filled = (currentServerBoard[row] || []).length + boardPlacements[row].length;
+    for (let i = filled; i < max; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'card-slot';
+      el.appendChild(slot);
+    }
   });
-  area.appendChild(zonesRow);
+}
 
-  /* ---- Unassigned pool ---- */
-  const pool = makeZone('pool', 'Your Cards (drag to a row above)');
-  area.appendChild(pool);
-  cards.forEach((card, idx) => {
-    $('zone-pool-cards').appendChild(makeDraggableCard(card, idx));
+function renderHandArea() {
+  const pool   = $('hand-pool');
+  pool.innerHTML = '';
+  const placed = getAllPlacedIndices();
+  const unplacedCount = currentCards.length - placed.size;
+
+  currentCards.forEach((card, idx) => {
+    if (!placed.has(idx)) {
+      const el = makeCard(card, true, idx);
+      // Mark as auto-discard when exactly one card remains in a 3-card round
+      if (!isInitial && unplacedCount === 1) el.classList.add('will-discard');
+      pool.appendChild(el);
+    }
   });
+}
 
+function refreshUI() {
+  renderPlayerBoard();
+  if (isActionMode) renderHandArea();
   updateConfirmButton();
 }
 
-function makeZone(name, customLabel) {
+/* ── Card DOM builder (SVG sprite) ──────────────────────────────────────── */
+function makeCard(c, isDraggable = false, idx = null) {
+  const suitName   = SUIT_NAME[c.suit];
+  const heightName = HEIGHT_NAME[c.height];
+  const spriteId   = `${suitName}_${heightName}`;
+
   const wrap = document.createElement('div');
-  wrap.className = 'drop-zone' + (name === 'discard' ? ' discard-zone' : '') + (name === 'pool' ? ' pool-zone' : '');
-  wrap.id = `zone-${name}`;
+  wrap.className = 'card-wrap' + (isDraggable ? ' hand-card' : '');
 
-  const hdr = document.createElement('div');
-  hdr.className = 'zone-header';
-  const cap = { front: 3, middle: 5, back: 5, discard: 1 }[name];
-  hdr.textContent = customLabel || (name.charAt(0).toUpperCase() + name.slice(1));
-  if (cap && !customLabel) hdr.textContent += ` (${cap})`;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 169.075 244.640');
+  svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 
-  const cards = document.createElement('div');
-  cards.className = 'zone-cards';
-  cards.id = `zone-${name}-cards`;
+  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+  use.setAttribute('href', `${CARD_SPRITE}#${spriteId}`);
+  svg.appendChild(use);
+  wrap.appendChild(svg);
 
-  wrap.appendChild(hdr);
-  wrap.appendChild(cards);
-
-  // Both the wrapper and the cards container are drop targets
-  [wrap, cards].forEach(el => {
-    el.addEventListener('dragover', e => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      wrap.classList.add('drag-over');
+  if (isDraggable && idx !== null) {
+    wrap.setAttribute('draggable', 'true');
+    wrap.dataset.idx = idx;
+    wrap.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', String(idx));
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => wrap.classList.add('dragging'), 0);
     });
-    el.addEventListener('dragleave', e => {
-      if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('drag-over');
-    });
-    el.addEventListener('drop', e => {
-      e.preventDefault();
-      wrap.classList.remove('drag-over');
-      const idx = parseInt(e.dataTransfer.getData('text/plain'));
-      if (!isNaN(idx)) moveCard(idx, name);
-    });
-  });
+    wrap.addEventListener('dragend', () => wrap.classList.remove('dragging'));
+  }
 
   return wrap;
 }
 
-function makeDraggableCard(c, idx) {
-  const el = makeCard(c, true);
-  el.dataset.idx = idx;
-  el.draggable = true;
-  el.addEventListener('dragstart', e => {
-    e.dataTransfer.setData('text/plain', String(idx));
-    e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => el.classList.add('dragging'), 0);
+/* ── Drag-and-drop – board rows ─────────────────────────────────────────── */
+function enableBoardDrop() {
+  ['front', 'middle', 'back'].forEach(row => {
+    const el = $(`player-${row}`);
+    el.classList.add('drop-row');
+    el.addEventListener('dragover',  onRowDragOver);
+    el.addEventListener('dragleave', onRowDragLeave);
+    el.addEventListener('drop',      onRowDrop);
   });
-  el.addEventListener('dragend', () => el.classList.remove('dragging'));
-  return el;
+  // Hand pool also accepts drops (return card to hand)
+  const pool = $('hand-pool');
+  pool.addEventListener('dragover', e => e.preventDefault());
+  pool.addEventListener('drop', onPoolDrop);
 }
 
-/* ── Card movement ──────────────────────────────────────────────────────── */
-function moveCard(idx, toZone) {
-  const cardEl = document.querySelector(`.hand-card[data-idx="${idx}"]`);
-  if (!cardEl) return;
-
-  if (toZone === 'pool') {
-    delete assignments[idx];
-  } else {
-    assignments[idx] = toZone;
-  }
-
-  const target = $(`zone-${toZone}-cards`);
-  if (target) target.appendChild(cardEl);
-  updateConfirmButton();
-}
-
-/* ── Card DOM builder ───────────────────────────────────────────────────── */
-function makeCard(c, isHandCard = false) {
-  const symbol = SUIT_SYMBOL[c.suit];
-  const color  = SUIT_COLOR[c.suit];
-  const rank   = c.height === 'T' ? '10' : c.height;
-
-  const el = document.createElement('div');
-  el.className = `card ${color}${isHandCard ? ' hand-card' : ''}`;
-
-  /* Top-left corner */
-  const tl = document.createElement('div');
-  tl.className = 'corner tl';
-  tl.innerHTML = `<span class="rank">${rank}</span><span class="suit-sym">${symbol}</span>`;
-
-  /* Card face */
-  const face = document.createElement('div');
-  face.className = 'card-face';
-  face.appendChild(buildFaceContent(c.height, symbol));
-
-  /* Bottom-right corner (rotated 180°) */
-  const br = document.createElement('div');
-  br.className = 'corner br';
-  br.innerHTML = `<span class="rank">${rank}</span><span class="suit-sym">${symbol}</span>`;
-
-  el.append(tl, face, br);
-  return el;
-}
-
-function buildFaceContent(height, symbol) {
-  /* Ace: one large suit symbol */
-  if (height === 'A') {
-    const el = document.createElement('div');
-    el.className = 'ace-center';
-    el.textContent = symbol;
-    return el;
-  }
-
-  /* Face card: large letter in a thin frame */
-  if (height in FACE_LABELS) {
-    const el = document.createElement('div');
-    el.className = 'face-center';
-    el.textContent = FACE_LABELS[height];
-    return el;
-  }
-
-  /* Number card: pip grid */
-  const pips = PIP_LAYOUTS[height] || [];
-  const el = document.createElement('div');
-  el.className = 'pips';
-  pips.forEach(([t, l, inv]) => {
-    const pip = document.createElement('span');
-    pip.className = 'pip' + (inv ? ' inv' : '');
-    pip.style.top  = t + '%';
-    pip.style.left = l + '%';
-    pip.textContent = symbol;
-    el.appendChild(pip);
+function disableBoardDrop() {
+  ['front', 'middle', 'back'].forEach(row => {
+    const el = $(`player-${row}`);
+    el.classList.remove('drop-row', 'drag-over');
+    el.removeEventListener('dragover',  onRowDragOver);
+    el.removeEventListener('dragleave', onRowDragLeave);
+    el.removeEventListener('drop',      onRowDrop);
   });
-  return el;
 }
 
-/* ── Validation ─────────────────────────────────────────────────────────── */
-function validateAssignments() {
-  if (Object.keys(assignments).length < currentCards.length) {
-    setHint('Place all cards before confirming.');
-    return false;
-  }
-  const counts = {};
-  Object.values(assignments).forEach(r => { counts[r] = (counts[r] || 0) + 1; });
-
-  if (isInitial) {
-    if ((counts.front || 0) > 3) { setHint('Front takes at most 3 cards.'); return false; }
-  } else {
-    if ((counts.discard || 0) !== 1) { setHint('Discard exactly 1 card.'); return false; }
-  }
-  setHint('');
-  return true;
+function onRowDragOver(e)  { e.preventDefault(); this.classList.add('drag-over'); }
+function onRowDragLeave(e) { if (!this.contains(e.relatedTarget)) this.classList.remove('drag-over'); }
+function onRowDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over');
+  const idx = parseInt(e.dataTransfer.getData('text/plain'));
+  if (!isNaN(idx)) placeCardOnRow(idx, this.dataset.row);
+}
+function onPoolDrop(e) {
+  e.preventDefault();
+  const idx = parseInt(e.dataTransfer.getData('text/plain'));
+  if (!isNaN(idx)) returnCardToHand(idx);
 }
 
+/* ── Card placement logic ───────────────────────────────────────────────── */
+function placeCardOnRow(idx, row) {
+  const max     = row === 'front' ? 3 : 5;
+  const existing = (currentServerBoard[row] || []).length;
+  const current  = boardPlacements[row].length;
+  if (existing + current >= max) {
+    setHint(`${row.charAt(0).toUpperCase() + row.slice(1)} row is full.`);
+    return;
+  }
+  removeFromPlacements(idx); // move from wherever it was (idempotent)
+  boardPlacements[row].push(idx);
+  refreshUI();
+}
+
+function returnCardToHand(idx) {
+  removeFromPlacements(idx);
+  refreshUI();
+}
+
+function removeFromPlacements(idx) {
+  ['front', 'middle', 'back'].forEach(row => {
+    boardPlacements[row] = boardPlacements[row].filter(i => i !== idx);
+  });
+}
+
+function getAllPlacedIndices() {
+  return new Set([...boardPlacements.front, ...boardPlacements.middle, ...boardPlacements.back]);
+}
+
+/* ── Validation / confirm button ────────────────────────────────────────── */
 function updateConfirmButton() {
-  const n    = currentCards.length;
-  const done = Object.keys(assignments).length === n;
-  let valid  = done;
+  if (!isActionMode) { $('btn-confirm').disabled = true; return; }
 
-  if (done) {
-    const counts = {};
-    Object.values(assignments).forEach(r => { counts[r] = (counts[r] || 0) + 1; });
-    if (isInitial && (counts.front || 0) > 3) {
-      valid = false; setHint('Front takes at most 3 cards.');
-    } else if (!isInitial && (counts.discard || 0) !== 1) {
-      valid = false; setHint('Discard exactly 1 card.');
+  const totalPlaced = boardPlacements.front.length + boardPlacements.middle.length + boardPlacements.back.length;
+  const required    = isInitial ? currentCards.length : currentCards.length - 1;
+  $('btn-confirm').disabled = (totalPlaced !== required);
+
+  if (!isInitial) {
+    const unplaced = currentCards.length - totalPlaced;
+    if (unplaced > 1) {
+      setHint(`Place ${required - totalPlaced} more card${required - totalPlaced > 1 ? 's' : ''}.`);
+    } else if (unplaced === 1) {
+      setHint('The last card will be automatically discarded.');
     } else {
       setHint('');
     }
+  } else {
+    const unplaced = currentCards.length - totalPlaced;
+    setHint(unplaced > 0 ? `Place ${unplaced} more card${unplaced > 1 ? 's' : ''}.` : '');
   }
-  $('btn-confirm').disabled = !valid;
 }
 
 /* ── Game-over screen ───────────────────────────────────────────────────── */
@@ -345,13 +341,16 @@ function showGameOver(state) {
 function hideGameOver() { $('game-over').classList.add('hidden'); }
 
 /* ── UI helpers ─────────────────────────────────────────────────────────── */
-function showLoading()   { $('loading').classList.remove('hidden'); }
-function hideLoading()   { $('loading').classList.add('hidden'); }
-function showActionArea(t) { $('action-title').textContent = t; $('action-area').classList.remove('hidden'); }
-function hideActionArea()  { $('action-area').classList.add('hidden'); }
-function setStatus(msg)  {
+function showLoading()  { $('loading').classList.remove('hidden'); }
+function hideLoading()  { $('loading').classList.add('hidden'); }
+function showActionArea(label) {
+  $('action-title').textContent = label;
+  $('action-area').classList.remove('hidden');
+}
+function hideActionArea() { $('action-area').classList.add('hidden'); }
+function setStatus(msg) {
   const bar = $('status-bar');
   if (msg) { bar.textContent = msg; bar.classList.remove('hidden'); }
   else     { bar.classList.add('hidden'); }
 }
-function setHint(msg) { $('placement-hint').textContent = msg; }
+function setHint(msg) { $('placement-hint').textContent = msg || ''; }
