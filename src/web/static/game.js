@@ -40,13 +40,12 @@ function renderGlobalScore() {
   $('score-ai').textContent     = globalScore.ai;
 }
 
-/* ── SVG sprite map ─────────────────────────────────────────────────────── */
-const CARD_SPRITE = '/static/svg-cards.svg';
-const SUIT_NAME   = { d: 'diamond', c: 'club', s: 'spade', h: 'heart' };
-const HEIGHT_NAME = {
-  A: '1', '2': '2', '3': '3', '4': '4', '5': '5',
-  '6': '6', '7': '7', '8': '8', '9': '9', T: '10',
-  J: 'jack', Q: 'queen', K: 'king',
+/* ── Card display maps ──────────────────────────────────────────────────── */
+const SUIT_SYMBOL = { d: '♦', c: '♣', s: '♠', h: '♥' };
+const SUIT_CLASS  = { d: 'suit-d', c: 'suit-c', s: 'suit-s', h: 'suit-h' };
+const RANK_LABEL  = {
+  A: 'A', '2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9',
+  T: '10', J: 'J', Q: 'Q', K: 'K',
 };
 
 /* ── DOM helper ─────────────────────────────────────────────────────────── */
@@ -210,26 +209,27 @@ function refreshUI() {
   updateConfirmButton();
 }
 
-/* ── Card DOM builder (SVG sprite) ──────────────────────────────────────── */
+/* ── Card DOM builder ───────────────────────────────────────────────────── */
 // Always creates at board size. Caller adds 'hand-card' class for the
 // larger hand-pool size. 'draggable' class is added when isDraggable=true.
 function makeCard(c, isDraggable = false, idx = null) {
-  const suitName   = SUIT_NAME[c.suit];
-  const heightName = HEIGHT_NAME[c.height];
-  const spriteId   = `${suitName}_${heightName}`;
+  const sym   = SUIT_SYMBOL[c.suit];
+  const cls   = SUIT_CLASS[c.suit];
+  const label = RANK_LABEL[c.height];
 
   const wrap = document.createElement('div');
-  wrap.className = 'card-wrap';
+  wrap.className = `card-wrap ${cls}`;
 
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 169.075 244.640');
-  svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  svg.setAttribute('draggable', 'false'); // prevent SVG href from being treated as a draggable link
-
-  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-  use.setAttribute('href', `${CARD_SPRITE}#${spriteId}`);
-  svg.appendChild(use);
-  wrap.appendChild(svg);
+  wrap.innerHTML = `
+    <div class="card-corner card-corner-tl">
+      <span class="card-rank">${label}</span>
+      <span class="card-suit-sym">${sym}</span>
+    </div>
+    <div class="card-center-sym">${sym}</div>
+    <div class="card-corner card-corner-br">
+      <span class="card-rank">${label}</span>
+      <span class="card-suit-sym">${sym}</span>
+    </div>`;
 
   if (isDraggable && idx !== null) {
     wrap.classList.add('draggable');

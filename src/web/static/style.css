@@ -142,28 +142,71 @@ header h1 { font-size: 1.65rem; color: var(--gold); letter-spacing: .05em; }
   box-shadow: inset 0 0 0 1px var(--gold-dark);
 }
 
-/* ── Cards (SVG sprite wrapper) ─────────────────────────────────────────── */
+/* ── Cards ──────────────────────────────────────────────────────────────── */
 .card-wrap {
+  position: relative;
   width: var(--card-w);
-  flex-shrink: 0;
-  border-radius: 6px;
+  height: var(--card-h);
+  background: #fff;
+  border-radius: 7px;
+  border: 1px solid rgba(0,0,0,.15);
   box-shadow: 0 2px 8px rgba(0,0,0,.45);
-  overflow: hidden;
-  line-height: 0;
+  flex-shrink: 0;
   user-select: none;
 }
-.card-wrap svg {
-  width: 100%;
-  height: auto;
-  display: block;
-  pointer-events: none; /* let the wrapper div own all mouse/drag events */
+
+/* 4-colour deck */
+.suit-s { --suit-color: #1a1a1a; }
+.suit-h { --suit-color: #d62828; }
+.suit-d { --suit-color: #1558d6; }
+.suit-c { --suit-color: #1a8040; }
+
+.card-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--suit-color);
+  line-height: 1.05;
+}
+.card-corner-tl { top: 3px; left: 4px; }
+.card-corner-br { bottom: 3px; right: 4px; transform: rotate(180deg); }
+
+.card-rank {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+.card-suit-sym {
+  font-size: 11px;
+  line-height: 1;
+}
+.card-center-sym {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  color: var(--suit-color);
+  line-height: 1;
 }
 
 /* Hand pool cards: larger size */
 .card-wrap.hand-card {
   width: var(--hand-w);
+  height: var(--hand-h);
   box-shadow: 0 4px 14px rgba(0,0,0,.5);
   transition: transform .1s, box-shadow .1s;
+}
+.card-wrap.hand-card .card-rank     { font-size: 20px; }
+.card-wrap.hand-card .card-suit-sym { font-size: 15px; }
+.card-wrap.hand-card .card-center-sym { font-size: 40px; }
+
+/* Hover lift on draggable hand cards */
+.card-wrap.hand-card.draggable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 22px rgba(0,0,0,.55);
 }
 
 /* Any draggable card: grab cursor */
@@ -180,7 +223,6 @@ header h1 { font-size: 1.65rem; color: var(--gold); letter-spacing: .05em; }
 .card-wrap.will-discard {
   opacity: .45;
   filter: grayscale(0.6);
-  position: relative;
 }
 .card-wrap.will-discard::after {
   content: 'DISCARD';
@@ -193,6 +235,7 @@ header h1 { font-size: 1.65rem; color: var(--gold); letter-spacing: .05em; }
   letter-spacing: .06em;
   text-align: center;
   padding: 3px 0;
+  border-radius: 0 0 6px 6px;
 }
 
 /* ── Empty slot ─────────────────────────────────────────────────────────── */
