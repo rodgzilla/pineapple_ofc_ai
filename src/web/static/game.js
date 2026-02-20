@@ -137,6 +137,7 @@ function applyState(state) {
   } else if (state.phase === 'game_over') {
     isActionMode = false;
     currentServerBoard = state.player_board;
+    boardPlacements = { front: [], middle: [], back: [] };
     disableBoardDrop();
     hideActionArea();
     refreshUI();
