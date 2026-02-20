@@ -224,6 +224,7 @@ function makeCard(c, isDraggable = false, idx = null) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 169.075 244.640');
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  svg.setAttribute('draggable', 'false'); // prevent SVG href from being treated as a draggable link
 
   const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
   use.setAttribute('href', `${CARD_SPRITE}#${spriteId}`);
@@ -246,6 +247,10 @@ function makeCard(c, isDraggable = false, idx = null) {
 }
 
 /* ── Drag-and-drop – board rows ─────────────────────────────────────────── */
+// Prevent the browser from navigating when a card is dropped outside a drop zone.
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop',     e => e.preventDefault());
+
 function enableBoardDrop() {
   ['front', 'middle', 'back'].forEach(row => {
     const el = $(`player-${row}`);
@@ -254,10 +259,11 @@ function enableBoardDrop() {
     el.addEventListener('dragleave', onRowDragLeave);
     el.addEventListener('drop',      onRowDrop);
   });
-  // Hand pool also accepts drops (return card to hand)
+  // Hand pool also accepts drops (return card to hand).
+  // Use named functions so the same listener can be cleanly removed.
   const pool = $('hand-pool');
-  pool.addEventListener('dragover', e => e.preventDefault());
-  pool.addEventListener('drop', onPoolDrop);
+  pool.addEventListener('dragover', onPoolDragOver);
+  pool.addEventListener('drop',     onPoolDrop);
 }
 
 function disableBoardDrop() {
@@ -268,6 +274,9 @@ function disableBoardDrop() {
     el.removeEventListener('dragleave', onRowDragLeave);
     el.removeEventListener('drop',      onRowDrop);
   });
+  const pool = $('hand-pool');
+  pool.removeEventListener('dragover', onPoolDragOver);
+  pool.removeEventListener('drop',     onPoolDrop);
 }
 
 function onRowDragOver(e)  { e.preventDefault(); this.classList.add('drag-over'); }
@@ -278,6 +287,7 @@ function onRowDrop(e) {
   const idx = parseInt(e.dataTransfer.getData('text/plain'));
   if (!isNaN(idx)) placeCardOnRow(idx, this.dataset.row);
 }
+function onPoolDragOver(e) { e.preventDefault(); }
 function onPoolDrop(e) {
   e.preventDefault();
   const idx = parseInt(e.dataTransfer.getData('text/plain'));
@@ -339,7 +349,10 @@ function updateConfirmButton() {
 /* ── Game-over screen ───────────────────────────────────────────────────── */
 function showGameOver(state) {
   const { scores, is_foul: isFoul, hand_results: results } = state;
-  addToGlobalScore(scores.player, scores.ai);
+  // Only the winner's counter grows, by the net score difference.
+  // (Foul handling is already baked into scores by the server.)
+  const diff = scores.player - scores.ai;
+  addToGlobalScore(Math.max(diff, 0), Math.max(-diff, 0));
   const playerWon = scores.player > scores.ai;
   const aiWon     = scores.ai > scores.player;
 

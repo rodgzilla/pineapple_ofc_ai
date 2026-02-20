@@ -409,11 +409,11 @@ class Hand():
         if len(self.strength) == 0:
             self._compute_strength()
 
-            return not (
-                self.strength[HandId.front] <=
-                self.strength[HandId.middle] <=
-                self.strength[HandId.back]
-            )
+        return not (
+            self.strength[HandId.front] <=
+            self.strength[HandId.middle] <=
+            self.strength[HandId.back]
+        )
 
     def compute_bonus(self):
         if not self.is_hand_complete():

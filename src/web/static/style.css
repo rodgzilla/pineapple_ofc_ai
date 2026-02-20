@@ -156,6 +156,7 @@ header h1 { font-size: 1.65rem; color: var(--gold); letter-spacing: .05em; }
   width: 100%;
   height: auto;
   display: block;
+  pointer-events: none; /* let the wrapper div own all mouse/drag events */
 }
 
 /* Hand pool cards: larger size */
