@@ -1,3 +1,4 @@
+import math
 import pickle
 from typing import List, Tuple, Union, Optional, cast, DefaultDict
 from enum import Enum, IntEnum, auto
@@ -661,6 +662,93 @@ def generate_non_initial_plays() -> List[Tuple[PlayId, ...]]:
     ]
 
 
+def partial_hand_score(cards: List[Card], hand_id: HandId, max_cards: int) -> float:
+    """Heuristic value for a (possibly incomplete) hand row.
+
+    Estimates quality and future potential of the cards assigned to a row,
+    accounting for row-specific royalty bonuses.  Used by HeuristicPlayer
+    to guide card placement during MCTS rollouts.
+    """
+    if not cards:
+        return 0.0
+
+    height_counter = Counter(c.int_height for c in cards)
+    suit_counter   = Counter(c.suit for c in cards)
+    heights        = [c.int_height for c in cards]
+    counts         = sorted(height_counter.values(), reverse=True)
+    top            = counts[0]
+    score          = 0.0
+
+    # --- Matching cards (pairs / trips / quads / full house) ---
+    if top >= 4:
+        score += 220
+    elif top == 3:
+        score += 100
+        if len(counts) >= 2 and counts[1] == 2:
+            score += 80   # full-house potential
+    elif top == 2:
+        n_pairs = sum(1 for c in counts if c == 2)
+        score  += 60 if n_pairs >= 2 else 30
+        best_pair = max(h for h, c in height_counter.items() if c >= 2)
+        score += best_pair   # prefer higher pairs (0–12)
+
+    # --- Flush potential (5-card rows only) ---
+    if max_cards == 5:
+        dom = max(suit_counter.values())
+        if dom == 5:
+            score += 120
+        elif dom == 4:
+            score += 45
+        elif dom == 3:
+            score += 10
+
+    # --- Straight potential (5-card rows, no duplicate heights) ---
+    if max_cards == 5 and top == 1:
+        sh   = sorted(heights)
+        span = sh[-1] - sh[0]
+        n    = len(sh)
+        if n >= 3 and span <= 4:
+            score += 10 + n * 12        # e.g. 5 connected → 70
+        # A-low wheel (A-2-3-4-5)
+        if 12 in sh:
+            low = sum(1 for h in sh if h <= 3)
+            if low + 1 >= 3:
+                score += 20
+
+    # --- Row-specific royalty bonuses ---
+    if hand_id == HandId.front:
+        # Trips in front = 10-22 pts royalty (extremely valuable)
+        if top >= 3:
+            trips_h = max(h for h, c in height_counter.items() if c >= 3)
+            score  += 200 + trips_h * 8
+        # Pairs of 6+ earn 1-9 pts royalty
+        elif top == 2:
+            best_pair = max(h for h, c in height_counter.items() if c == 2)
+            if best_pair >= 4:   # int 4 = card rank 6
+                score += 30 + (best_pair - 4) * 8
+
+    elif hand_id == HandId.middle:
+        # Royalties (double back): trips=2, str=4, fl=8, FH=12, quads=20, SF=30-50
+        if top >= 4:
+            score += 100
+        elif top == 3 and len(counts) >= 2 and counts[1] == 2:
+            score += 60   # full house
+        elif top == 3:
+            score += 10   # trips
+
+    elif hand_id == HandId.back:
+        # Royalties: str=2, fl=4, FH=6, quads=10, SF=15-25
+        if top >= 4:
+            score += 50
+        elif top == 3 and len(counts) >= 2 and counts[1] == 2:
+            score += 30   # full house
+
+    # --- Raw card height ---
+    score += sum(heights) * 0.3
+
+    return score
+
+
 class RandomPlayer(Player):
     def __init__(self):
         self.possible_initial_plays     = generate_initial_plays()
@@ -692,6 +780,79 @@ class RandomPlayer(Player):
 
         # We return a randomly chosen play
         return random.choice(plays)
+
+
+class HeuristicPlayer(Player):
+    """AI player driven by hand-crafted OFC heuristics.
+
+    Used as the *rollout policy* inside UCTPlayer to produce much more
+    informative simulations than the purely random RandomPlayer.
+
+    Key heuristics
+    --------------
+    * Keeps pairs / trips / quads together in the same row.
+    * Targets row-specific royalty bonuses (trips in front, flushes in
+      middle, full houses in back, etc.).
+    * Prefers stronger cards towards back > middle > front.
+    * Applies a heavy penalty to placements that result in a foul hand.
+    """
+
+    def __init__(self):
+        self.possible_initial_plays     = generate_initial_plays()
+        self.possible_non_initial_plays = generate_non_initial_plays()
+
+    def _score_placement(
+            self,
+            hand    : Hand,
+            cards   : List[Card],
+            play_ids: Tuple[PlayId, ...],
+    ) -> float:
+        front_cards  = list(hand.hands[HandId.front].cards)
+        middle_cards = list(hand.hands[HandId.middle].cards)
+        back_cards   = list(hand.hands[HandId.back].cards)
+
+        for card, play_id in zip(cards, play_ids):
+            if play_id == PlayId.front:
+                front_cards.append(card)
+            elif play_id == PlayId.middle:
+                middle_cards.append(card)
+            elif play_id == PlayId.back:
+                back_cards.append(card)
+
+        score  = 0.0
+        score += partial_hand_score(front_cards,  HandId.front,  3) * 0.9
+        score += partial_hand_score(middle_cards, HandId.middle, 5) * 1.1
+        score += partial_hand_score(back_cards,   HandId.back,   5) * 1.0
+
+        # Foul detection (only possible when all rows are complete)
+        if (len(front_cards) == 3 and len(middle_cards) == 5 and
+                len(back_cards) == 5):
+            f_str = SingleHandStrength(SingleHand(front_cards))
+            m_str = SingleHandStrength(SingleHand(middle_cards))
+            b_str = SingleHandStrength(SingleHand(back_cards))
+            if f_str > m_str or m_str > b_str:
+                score -= 2000   # Heavy foul penalty
+
+        return score
+
+    def get_play(
+            self,
+            game     : Game,
+            player_id: PlayerId,
+            cards    : List[Card],
+            initial  : bool,
+    ) -> Tuple[PlayId, ...]:
+        plays = (
+            self.possible_initial_plays
+            if initial else
+            self.possible_non_initial_plays
+        )
+        plays = [
+            play for play in plays
+            if game.is_valid_play(player_id, cards, play)
+        ]
+        hand = game.hands[player_id]
+        return max(plays, key=lambda p: self._score_placement(hand, list(cards), p))
 
 
 class MonteCarloPlayer(Player):
@@ -844,6 +1005,138 @@ class MonteCarloPlayer(Player):
             print(f'Playing {card} to {play_id.name}')
 
         return selected_play
+
+
+class UCTPlayer(Player):
+    """Improved Monte Carlo player using UCT-based simulation allocation
+    and HeuristicPlayer rollouts.
+
+    Two radical improvements over MonteCarloPlayer
+    -----------------------------------------------
+    1. **UCT selection** – instead of round-robin (equal budget per move),
+       the Upper Confidence Bound formula focuses simulations on the most
+       promising moves while still exploring under-tested ones::
+
+           UCT(move) = mean_score_diff + C * sqrt(ln(N) / n)
+
+       This concentrates the simulation budget where it matters most,
+       especially important for the opening 5-card placement where there
+       are 100-200+ valid moves.
+
+    2. **HeuristicPlayer rollouts** – random play-outs (RandomPlayer) are
+       replaced by heuristic-guided play-outs (HeuristicPlayer).  Heuristic
+       rollouts keep pairs together, avoid fouls, and target royalty bonuses,
+       producing evaluations that are far more correlated with actual game
+       value.  Even with the same simulation budget the signal-to-noise ratio
+       is dramatically better.
+    """
+
+    def __init__(
+            self,
+            player_id           : PlayerId,
+            n_run               : int,
+            cheating            : bool  = False,
+            exploration_constant: float = 1.0,
+    ):
+        self.player_id              = player_id
+        self.n_run                  = n_run
+        self.cheating               = cheating
+        self.C                      = exploration_constant
+        self.is_maximizing          = (player_id == PlayerId.player_1)
+        self.possible_initial_plays = generate_initial_plays()
+        self.possible_non_initial_plays = generate_non_initial_plays()
+        # Reuse rollout player instances across simulations (they are stateless)
+        self._h1 = HeuristicPlayer()
+        self._h2 = HeuristicPlayer()
+
+    def _uct_score(
+            self,
+            outcomes  : List[Tuple[int, int]],
+            total_sims: int,
+    ) -> float:
+        """UCT score: mean value + exploration bonus."""
+        n = len(outcomes)
+        if n == 0:
+            return float('inf')   # always explore unvisited moves first
+        mean = sum(s1 - s2 for s1, s2 in outcomes) / n
+        if not self.is_maximizing:
+            mean = -mean
+        return mean + self.C * math.sqrt(math.log(max(total_sims, 1)) / n)
+
+    def _select_play(
+            self,
+            play_to_outcomes: DefaultDict[Tuple[PlayId, ...], List[Tuple[int, int]]],
+            total_sims      : int,
+    ) -> Tuple[PlayId, ...]:
+        return max(
+            play_to_outcomes.keys(),
+            key=lambda p: self._uct_score(play_to_outcomes[p], total_sims),
+        )
+
+    def _select_best_play(
+            self,
+            play_to_outcomes: DefaultDict[Tuple[PlayId, ...], List[Tuple[int, int]]],
+    ) -> Tuple[PlayId, ...]:
+        """Final move selection: highest mean score difference."""
+        def mean_diff(outcomes: List[Tuple[int, int]]) -> float:
+            if not outcomes:
+                return float('-inf') if self.is_maximizing else float('inf')
+            return sum(s1 - s2 for s1, s2 in outcomes) / len(outcomes)
+
+        fn = max if self.is_maximizing else min
+        return fn(play_to_outcomes.keys(), key=lambda p: mean_diff(play_to_outcomes[p]))
+
+    def get_play(
+            self,
+            game     : Game,
+            player_id: PlayerId,
+            cards    : List[Card],
+            initial  : bool,
+    ) -> Tuple[PlayId, ...]:
+        plays = (
+            self.possible_initial_plays
+            if initial else
+            self.possible_non_initial_plays
+        )
+        plays = [
+            play for play in plays
+            if game.is_valid_play(player_id, cards, play)
+        ]
+
+        play_to_outcomes: DefaultDict[
+            Tuple[PlayId, ...],
+            List[Tuple[int, int]]
+        ] = defaultdict(list)
+        for play in plays:
+            play_to_outcomes[play]   # pre-populate so UCT sees all options
+
+        game_bytes = pickle.dumps(game, protocol=pickle.HIGHEST_PROTOCOL)
+
+        for i in range(self.n_run):
+            play_to_explore = self._select_play(play_to_outcomes, i + 1)
+            current_game    = pickle.loads(game_bytes)
+            current_game.play(
+                player_id=player_id,
+                cards=cards,
+                play_ids=play_to_explore,
+            )
+            if not self.cheating:
+                current_game.deck.reshuffle()
+
+            rollout = GameLoop(
+                player_1=self._h1,
+                player_2=self._h2,
+                game=current_game,
+                verbose=False,
+            )
+            outcome = rollout.run()
+            play_to_outcomes[play_to_explore].append(outcome)
+
+        selected = self._select_best_play(play_to_outcomes)
+        for card, play_id in zip(cards, selected):
+            if play_id != PlayId.discard:
+                print(f'Playing {card} to {play_id.name}')
+        return selected
 
 
 class GameLoop():

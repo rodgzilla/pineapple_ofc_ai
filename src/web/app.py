@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from flask import Flask, request, jsonify, render_template
 from src.engine.game import (
     Game, PlayerId, PlayId, HandId, HandRank,
-    MonteCarloPlayer, Card, Suit,
+    MonteCarloPlayer, UCTPlayer, Card, Suit,
 )
 
 app = Flask(__name__)
@@ -19,7 +19,11 @@ games = {}
 # Tracks how many games have been started (used to alternate first player)
 game_count = 0
 
-# Monte Carlo simulations per AI turn (lower = faster response, weaker AI)
+# Simulations per AI turn for UCTPlayer (lower = faster response, weaker AI).
+# UCTPlayer with HeuristicPlayer rollouts produces much stronger play than
+# the old MonteCarloPlayer at the same simulation budget, because:
+#   1. UCT focuses simulations on promising moves (not round-robin)
+#   2. HeuristicPlayer rollouts are far more accurate than random play
 N_SIMULATIONS = 20000
 
 HAND_RANK_NAMES = {
@@ -160,7 +164,7 @@ def new_game():
 
     game_id  = str(uuid.uuid4())
     game     = Game()
-    ai_player = MonteCarloPlayer(
+    ai_player = UCTPlayer(
         player_id=PlayerId.player_2,
         n_run=N_SIMULATIONS,
         cheating=False,
