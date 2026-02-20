@@ -930,6 +930,12 @@ class GameLoop():
                 self.current_player = PlayerId.player_2
             else:
                 self.current_player = PlayerId.player_1
+            # When one player finishes ahead of the other (e.g. ai_goes_first
+            # simulations), skip their remaining turns rather than trying to
+            # place cards on a complete hand (which produces an empty play list
+            # and crashes RandomPlayer.get_play with IndexError).
+            if self.game.hands[self.current_player].is_hand_complete():
+                continue
             if self.verbose:
                 print(self.current_player.name, 'turn')
             hand     = self.game.draw_three_cards()
